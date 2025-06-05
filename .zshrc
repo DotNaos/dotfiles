@@ -16,11 +16,6 @@ source "${ZINIT_HOME}/zinit.zsh"
 zinit ice depth=1;
 
 ################ PROMPT ################
-# ! >>>>>>>>> powerlevel10k
-# zinit ice depth=1; zinit light romkatv/powerlevel10k
-
-# [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
 # ! >>>>>>>>> starship
 eval "$(starship init zsh)"
 
@@ -41,6 +36,8 @@ zinit light zsh-users/zsh-completions
 zinit light zsh-users/zsh-autosuggestions
 zinit light Aloxaf/fzf-tab
 
+zinit light jeffreytse/zsh-vi-mode
+
 
 
 # Add oh-my-zsh plugins
@@ -50,6 +47,10 @@ zinit snippet OMZP::archlinux
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
+zinit snippet OMZP::docker
+zinit snippet OMZP::brew
+zinit snippet OMZP::nvm
+zinit snippet OMZP::colorize
 
 # Load completions
 autoload -U compinit && compinit
@@ -87,7 +88,56 @@ setopt hist_find_no_dups
 alias cls='clear'
 alias c='clear'
 alias ls='ls --color=auto'
+alias gtree='git ls-tree -r --name-only HEAD | tree --fromfile'
 
 ################ SHELL INTEGRATION ################
 eval "$(fzf --zsh)"
 eval "$(zoxide init --cmd cd zsh)"
+
+eval "$(uv generate-shell-completion zsh)"
+eval "$(uvx --generate-shell-completion zsh)"
+eval
+    fuck () {
+        TF_PYTHONIOENCODING=$PYTHONIOENCODING;
+        export TF_SHELL=zsh;
+        export TF_ALIAS=fuck;
+        TF_SHELL_ALIASES=$(alias);
+        export TF_SHELL_ALIASES;
+        TF_HISTORY="$(fc -ln -10)";
+        export TF_HISTORY;
+        export PYTHONIOENCODING=utf-8;
+        TF_CMD=$(
+            thefuck THEFUCK_ARGUMENT_PLACEHOLDER $@
+        ) && eval $TF_CMD;
+        unset TF_HISTORY;
+        export PYTHONIOENCODING=$TF_PYTHONIOENCODING;
+        test -n "$TF_CMD" && print -s $TF_CMD
+    }
+
+
+
+
+# pnpm
+export PNPM_HOME="/Users/oli/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+
+export PATH="$PATH:/Users/oli/.modular/bin"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/oli/.lmstudio/bin"
+
+# Added by Windsurf
+export PATH="/Users/oli/.codeium/windsurf/bin:$PATH"
+export PATH="/Users/oli/.codeium/windsurf/bin:$PATH"
+
+################ API KEYS ################
+. "$HOME/.local/bin/env"
+# API Keys (load from .env file)
+if [ -f "$HOME/.env" ]; then
+  export $(grep -v '^#' "$HOME/.env" | xargs)
+fi
