@@ -18,6 +18,14 @@ zinit ice depth=1;
 # ! >>>>>>>>> starship
 eval "$(starship init zsh)"
 
+################ ZSTYLE ################
+# Base
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' menu no
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
+zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
+zstyle ':fzf-tab:*' path-expand false
+
 ################ ZINIT PLUGINS ################
 # Base
 zinit light zsh-users/zsh-syntax-highlighting
@@ -59,12 +67,6 @@ autoload -U compinit && compinit
 
 zinit cdreplay -q
 
-################ ZSTYLE ################
-# Base
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-zstyle ':completion:*' menu no
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
 ################ KEYBINDS ################
 bindkey -e # Use emacs keybindings
