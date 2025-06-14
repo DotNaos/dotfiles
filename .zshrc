@@ -1,4 +1,17 @@
-eval "$(/opt/homebrew/bin/brew shellenv)"
+# Initialize brew environment (supports both macOS Homebrew and Linux Linuxbrew)
+if [[ -f "/opt/homebrew/bin/brew" ]]; then
+    # macOS Homebrew (Apple Silicon)
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+    # macOS Homebrew (Intel) or Linux system-wide
+    eval "$(/usr/local/bin/brew shellenv)"
+elif [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+    # Linux Linuxbrew (system-wide)
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
+    # Linux Linuxbrew (user-specific)
+    eval "$($HOME/.linuxbrew/bin/brew shellenv)"
+fi
 # Zinit plugin directory
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
