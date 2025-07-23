@@ -47,8 +47,8 @@ zinit light zsh-users/zsh-autosuggestions
 zinit light Aloxaf/fzf-tab
 
 # Custom
-zinit light marlonrichert/zsh-autocomplete
-zinit light jeffreytse/zsh-vi-mode
+# zinit light marlonrichert/zsh-autocomplete
+#zinit light jeffreytse/zsh-vi-mode
 
 # Add oh-my-zsh plugins
 zinit snippet OMZP::git
@@ -104,9 +104,15 @@ alias cls='clear'
 alias c='clear'
 alias ls='ls --color=auto'
 alias gtree='git ls-tree -r --name-only HEAD | tree --fromfile'
+alias docker-killall='docker stop $(docker ps -a -q)'
+alias docker-removeall='docker rm $(docker ps -a -q)'
 
 ################ API KEYS ################
-. "$HOME/.local/bin/env"
+# Load local environment if available
+if [ -f "$HOME/.local/bin/env" ]; then
+    . "$HOME/.local/bin/env"
+fi
+
 # API Keys (load from .env file)
 if [ -f "$HOME/.env" ]; then
   export $(grep -v '^#' "$HOME/.env" | xargs)
@@ -127,6 +133,7 @@ add_to_path "/opt/homebrew/opt/libpq/bin"
 add_to_path "$HOME/.modular/bin"
 add_to_path "$HOME/.lmstudio/bin"
 add_to_path "$HOME/.codeium/windsurf/bin"
+add_to_path "$HOME/.dotnet/tools"
 
 ################ SHELL INTEGRATION ################
 eval "$(fzf --zsh)"
@@ -151,3 +158,11 @@ fuck () {
     export PYTHONIOENCODING=$TF_PYTHONIOENCODING;
     test -n "$TF_CMD" && print -s $TF_CMD
 }
+
+# pnpm
+export PNPM_HOME="/home/oli/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
