@@ -42,6 +42,7 @@
       "provider": "copilot_chat",
       "model": "o4-mini"
     },
+    "version": "2"
   },
   "features": {
     "edit_prediction_provider": "copilot"

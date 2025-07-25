@@ -47,7 +47,7 @@ zinit light zsh-users/zsh-autosuggestions
 zinit light Aloxaf/fzf-tab
 
 # Custom
-# zinit light marlonrichert/zsh-autocomplete
+#zinit light marlonrichert/zsh-autocomplete
 #zinit light jeffreytse/zsh-vi-mode
 
 # Add oh-my-zsh plugins
@@ -159,10 +159,18 @@ fuck () {
     test -n "$TF_CMD" && print -s $TF_CMD
 }
 
-# pnpm
+# pnpm: TODO: FIX THIS
 export PNPM_HOME="/home/oli/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+
+eval "$(rbenv init - zsh)"
+
+# In ~/.zshrc  (oder ~/.bashrc)
+if [[ "$TERM" == "xterm-ghostty" ]]; then
+  export TERM=xterm-256color
+fi
+
