@@ -120,16 +120,38 @@ fi
 
 ################ PATH CONFIGURATION ################
 # Function to add to PATH only if not already present
+# Usage: add_to_path <path> [os]
+# os can be: darwin (macOS), linux, or empty (all systems)
 add_to_path() {
+    local path="$1"
+    local target_os="$2"
+
+    # Use built-in OSTYPE variable instead of external commands
+    local current_os=""
+    case "$OSTYPE" in
+        darwin*) current_os="darwin" ;;
+        linux*) current_os="linux" ;;
+        *) current_os="unknown" ;;
+    esac
+
+    # If target_os is specified and doesn't match current OS, skip
+    if [[ -n "$target_os" && "$target_os" != "$current_os" ]]; then
+        return
+    fi
+
     case ":$PATH:" in
-        *":$1:"*) ;;
-        *) export PATH="$1:$PATH" ;;
+        *":$path:"*) ;;
+        *) export PATH="$path:$PATH" ;;
     esac
 }
 
 # Add various tools to PATH
-add_to_path "$HOME/Library/pnpm"
-add_to_path "/opt/homebrew/opt/libpq/bin"
+# OS specific paths
+add_to_path "$HOME/.local/share/pnpm" "linux" # PNPM for Linux
+add_to_path "$HOME/Library/pnpm" "darwin" # PNPM for macOS
+
+add_to_path "/opt/homebrew/opt/libpq/bin" "darwin"
+
 add_to_path "$HOME/.modular/bin"
 add_to_path "$HOME/.lmstudio/bin"
 add_to_path "$HOME/.codeium/windsurf/bin"
@@ -159,18 +181,9 @@ fuck () {
     test -n "$TF_CMD" && print -s $TF_CMD
 }
 
-# pnpm: TODO: FIX THIS
-export PNPM_HOME="/home/oli/.local/share/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
-
 eval "$(rbenv init - zsh)"
 
 # In ~/.zshrc  (oder ~/.bashrc)
 if [[ "$TERM" == "xterm-ghostty" ]]; then
   export TERM=xterm-256color
 fi
-
