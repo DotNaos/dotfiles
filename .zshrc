@@ -27,28 +27,11 @@ source "${ZINIT_HOME}/zinit.zsh"
 
 zinit ice depth=1;
 
-################ PROMPT ################
-# ! >>>>>>>>> starship
-eval "$(starship init zsh)"
+# Load user-only interactive customizations unless running in automated mode
+if [[ "$CLAUDECODE" != "1" ]] && [[ -f "$HOME/.zshrc_user" ]]; then
+  source "$HOME/.zshrc_user"
+fi
 
-################ ZSTYLE ################
-# Base
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-zstyle ':completion:*' menu no
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:*' path-expand false
-
-################ ZINIT PLUGINS ################
-# Base
-zinit light zsh-users/zsh-syntax-highlighting
-zinit light zsh-users/zsh-completions
-zinit light zsh-users/zsh-autosuggestions
-zinit light Aloxaf/fzf-tab
-
-# Custom
-#zinit light marlonrichert/zsh-autocomplete
-#zinit light jeffreytse/zsh-vi-mode
 
 # Add oh-my-zsh plugins
 zinit snippet OMZP::git
@@ -159,7 +142,6 @@ add_to_path "$HOME/.dotnet/tools"
 
 ################ SHELL INTEGRATION ################
 eval "$(fzf --zsh)"
-eval "$(zoxide init --cmd cd zsh)"
 eval "$(uv generate-shell-completion zsh)"
 eval "$(uvx --generate-shell-completion zsh)"
 

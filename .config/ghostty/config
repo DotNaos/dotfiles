@@ -3,7 +3,7 @@
 # This template file has been automatically created at the following
 # path since Ghostty couldn't find any existing config files on your system:
 #
-#   /Users/oli/Library/Application Support/com.mitchellh.ghostty/config
+#   /home/oli/.config/ghostty/config
 #
 # The template does not set any default options, since Ghostty ships
 # with sensible defaults for all options. Users should only need to set
@@ -41,14 +41,3 @@
 # # which is explained in the docs for that config option.
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
-
-font-family = "FiraCodeNerdFont-Bold"
-# font-style-bold=true
-theme = catppuccin-mocha
-font-size = 18
-shell-integration = zsh
-background-opacity = 0.75
-background-blur-radius = 50
-
-window-padding-x = 12
-window-padding-y = 12

@@ -1,0 +1,50 @@
+# ~/.zshrc_user
+# -------------------------------------------------------------
+# Real-user interactive customizations
+# Everything in this file is skipped when $CLAUDECODE==1 (e.g., CI or
+# automated terminals).
+# -------------------------------------------------------------
+
+# ---- zoxide --------------------------------------------------
+if command -v zoxide &>/dev/null; then
+  eval "$(zoxide init --cmd cd zsh)"
+
+  # Ensure __zoxide_z helper exists (fallback when completion misfires)
+  if ! type __zoxide_z &>/dev/null; then
+    __zoxide_z() {
+      if [[ "$#" -eq 0 ]]; then
+        builtin cd ~
+      elif [[ "$#" -eq 1 ]] && { [[ -d "$1" ]] || [[ "$1" = '-' ]] || [[ "$1" =~ ^[-+][0-9]$ ]]; }; then
+        builtin cd "$1"
+      else
+        local dst
+        dst="$(command zoxide query --exclude "$(pwd)" -- "$@")" && builtin cd "$dst"
+      fi
+    }
+  fi
+
+  # fzf-tab preview for zoxide completions
+  zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
+fi
+
+################ PROMPT ################
+# ! >>>>>>>>> starship
+eval "$(starship init zsh)"
+
+################ ZSTYLE ################
+# Base
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' menu no
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
+zstyle ':fzf-tab:*' path-expand false
+
+################ ZINIT PLUGINS ################
+# Base
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+zinit light zsh-users/zsh-autosuggestions
+zinit light Aloxaf/fzf-tab
+
+# Custom
+# zinit light marlonrichert/zsh-autocomplete
+#zinit light jeffreytse/zsh-vi-mode
