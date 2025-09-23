@@ -151,3 +151,79 @@ proto-recover() {
   echo "✓ '$curr' reset to $good_commit"
 }
 
+# proto-refactor [--push] [--keep-staged]
+# Zweck: Reste (unstaged) in prototype/backup/<feature> sichern, prototype/<feature> auf Feature-Spitze setzen
+# und am Ende in den Prototype-Branch wechseln.
+proto-refactor() {
+  local remote=origin push=0 keep_staged=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --push)        push=1 ;;
+      --keep-staged) keep_staged=1 ;;
+      *) echo "Unknown option: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  local curr proto backup
+  curr=$(git symbolic-ref --short HEAD 2>/dev/null) || { echo "✗ Not a git repo"; return 1; }
+  [[ "$curr" == prototype/* ]] && { echo "✗ Run on your feature branch, not on '$curr'."; return 1; }
+
+  proto="prototype/$curr"
+  backup="prototype/backup/$curr"
+
+  # staged-Änderungen nur erlauben, wenn --keep-staged gesetzt ist
+  if ! git diff --cached --quiet; then
+    (( keep_staged == 0 )) && { echo "✗ Staged changes on $curr. Commit or use --keep-staged."; return 1; }
+  fi
+
+  # Unstaged-Reste stashen (inkl. untracked), staged bleiben dank -k unberührt
+  local pre_stash post_stash had_leftovers=0
+  pre_stash=$(git rev-parse -q --verify refs/stash 2>/dev/null || echo "")
+  git stash push -u -k -m "proto-refactor leftovers on $curr" || return $?
+  post_stash=$(git rev-parse -q --verify refs/stash 2>/dev/null || echo "")
+  [[ "$pre_stash" != "$post_stash" ]] && had_leftovers=1
+
+  # Backup-Branch auf aktuellen Feature-Stand setzen/erstellen
+  if git show-ref --verify --quiet "refs/heads/$backup"; then
+    git branch -f "$backup" "$curr" || return $?
+  else
+    git branch "$backup" "$curr" || return $?
+  fi
+
+  # In Backup wechseln und Stash anwenden/committen (falls vorhanden)
+  git switch "$backup" || return $?
+  if (( had_leftovers == 1 )); then
+    if git stash apply --index; then
+      git stash drop || true
+      git add -A
+      git commit -m "proto: backup leftovers from $curr" || return $?
+    else
+      echo "⚠️ Conflicts applying leftovers to $backup. Resolve here, commit, then continue manually."
+      return 1
+    fi
+  fi
+
+  # Zurück zum Feature
+  git switch "$curr" || return $?
+
+  # Prototype-Branch auf Feature-Spitze setzen/erstellen
+  if git show-ref --verify --quiet "refs/heads/$proto"; then
+    git branch -f "$proto" "$curr" || return $?
+  else
+    git branch "$proto" "$curr" || return $?
+  fi
+
+  # Optional pushen
+  if (( push == 1 )); then
+    git push --force-with-lease "$remote" "$backup:$backup" || true
+    git push --force-with-lease "$remote" "$proto:$proto" || true
+  fi
+
+  # Am Ende in den Prototype-Branch wechseln
+  git switch "$proto" || return $?
+
+  echo "✓ Backup updated: $backup"
+  (( had_leftovers == 1 )) && echo "✓ Leftovers committed to backup."
+  echo "✓ Prototype synced & checked out: $proto"
+}
