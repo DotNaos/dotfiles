@@ -32,6 +32,8 @@ if [[ "$CLAUDECODE" != "1" ]] && [[ -f "$HOME/.zshrc_user" ]]; then
   source "$HOME/.zshrc_user"
 fi
 
+# Load zsh functions and custom commands 
+source "$HOME/.zshrc_functions"
 
 # Add oh-my-zsh plugins
 zinit snippet OMZP::git
@@ -169,3 +171,4 @@ eval "$(rbenv init - zsh)"
 if [[ "$TERM" == "xterm-ghostty" ]]; then
   export TERM=xterm-256color
 fi
+export PATH="$HOME/.local/bin:$PATH"

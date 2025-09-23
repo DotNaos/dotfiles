@@ -1,0 +1,153 @@
+# proto-start
+# - Erstellt/öffnet prototype/<current-branch>
+# - Legt optional die Remote-Tracking-Branch an
+proto-start() {
+  local remote=origin branch proto
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null) || { echo "✗ Not a git repo"; return 1; }
+  proto="prototype/${branch}"
+
+  git fetch --prune "$remote" >/dev/null 2>&1 || true
+
+  if git show-ref --verify --quiet "refs/heads/$proto"; then
+    git switch "$proto" || return $?
+  elif git ls-remote --heads "$remote" "$proto" >/dev/null 2>&1; then
+    git switch -c "$proto" --track "$remote/$proto" || return $?
+  else
+    git switch -c "$proto" || return $?
+    git push -u "$remote" "$proto" || true
+  fi
+
+  git config "branch.$proto.parent" "$branch" 2>/dev/null || true
+  echo "✓ On $proto (parent: $branch)"
+}
+
+# proto-apply [--keep-staged] [--sync]
+# - Wendet die Prototype-Änderungen als SQUASH auf den Feature-Branch an
+# - Standard: Änderungen werden *unstaged* ins Working Directory gelegt
+# - --keep-staged: belässt nach dem Squash die Änderungen *staged*
+# - --sync: setzt prototype/<feature> nach dem Bereinigen auf Feature-Tip (lokal + remote)
+proto-apply() {
+  local keep_staged=0 do_sync=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --keep-staged) keep_staged=1 ;;
+      --sync)        do_sync=1 ;;
+      *) echo "Unknown option: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  local remote=origin curr parent proto
+  curr=$(git symbolic-ref --short HEAD 2>/dev/null) || { echo "✗ Not a git repo"; return 1; }
+
+  if [[ "$curr" == prototype/* ]]; then
+    parent="${curr#prototype/}"
+    proto="$curr"
+  else
+    parent="$curr"
+    proto="prototype/$parent"
+  fi
+
+  # Working tree muss sauber sein, bevor wir squashen
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo "✗ Working tree not clean on $curr. Commit or stash first."; return 1
+  fi
+
+  # Prototype-Branch lokal sicherstellen (sonst von Remote holen)
+  if ! git rev-parse --verify --quiet "refs/heads/$proto" >/dev/null; then
+    if git ls-remote --heads "$remote" "$proto" >/dev/null 2>&1; then
+      git fetch "$remote" "$proto:$proto" || return $?
+    else
+      echo "✗ Prototype branch '$proto' not found (local or remote)."; return 1
+    fi
+  fi
+
+  # Auf parent wechseln, falls nötig
+  if [[ "$curr" != "$parent" ]]; then
+    git switch "$parent" || return $?
+  fi
+
+  # Squash-merge (keine Commit-Erstellung)
+  if ! git merge --squash "$proto"; then
+    echo "⚠️  Resolve conflicts, then 'git commit' (or 'git reset' to unstage)."
+    return 1
+  fi
+
+  # Standard: Änderungen *unstagen*, damit du sie gezielt neu einteilst
+  if (( keep_staged == 0 )); then
+    git reset  # mixed reset → Änderungen bleiben im Working Tree
+  fi
+
+  echo "✓ Prototype changes from '$proto' applied to '$parent'."
+  echo "→ Review, split into logical commits, then push."
+
+  if (( do_sync == 1 )); then
+    # Nach deinen sauberen Commits: Prototype-Branch auf Feature-Tip setzen
+    git branch -f "$proto" "$parent" || return $?
+    git push --force-with-lease "$remote" "$proto:$proto" || true
+    echo "✓ Synced '$proto' to '$parent'."
+  else
+    echo "ⓘ Optional: after committing, run 'proto-apply --sync' to sync prototype."
+  fi
+}
+
+# proto-recover <good_commit> [--force] [--push]
+# Use-case: Du hast AI-Commits direkt auf dem Feature-Branch gemacht.
+# Aktion: Legt prototype/<feature> auf *aktuellen HEAD* und setzt den Feature-Branch hart auf <good_commit> zurück.
+# Optionen:
+#   --force  : Falls prototype/<feature> existiert, auf aktuellen HEAD umbiegen
+#   --push   : Änderungen auf Remote pushen (prototype wird normal/force gepusht, feature wird force-with-lease gepusht)
+proto-recover() {
+  if [[ $# -lt 1 ]]; then
+    echo "Usage: proto-recover <good_commit> [--force] [--push]"
+    return 2
+  fi
+
+  local good_commit="$1"; shift
+  local force=0 push=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force) force=1 ;;
+      --push)  push=1 ;;
+      *) echo "Unknown option: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  git rev-parse --verify --quiet "${good_commit}^{commit}" >/dev/null || { echo "✗ Not a valid commit: $good_commit"; return 1; }
+
+  local curr branch_proto remote=origin
+  curr=$(git symbolic-ref --short HEAD 2>/dev/null) || { echo "✗ Not a git repo"; return 1; }
+  [[ "$curr" == prototype/* ]] && { echo "✗ You're on a prototype branch. Switch to the feature branch first."; return 1; }
+
+  [[ -n "$(git status --porcelain)" ]] && { echo "✗ Working tree not clean on $curr. Commit or stash first."; return 1; }
+
+  branch_proto="prototype/$curr"
+
+  git fetch --prune "$remote" >/dev/null 2>&1 || true
+
+  if git show-ref --verify --quiet "refs/heads/$branch_proto"; then
+    if (( force == 1 )); then
+      git branch -f "$branch_proto" HEAD || return $?
+      git push --force-with-lease "$remote" "$branch_proto:$branch_proto" >/dev/null 2>&1 || true
+    else
+      echo "✗ '$branch_proto' exists. Use --force to repoint it to current HEAD."
+      return 1
+    fi
+  else
+    git branch "$branch_proto" HEAD || return $?
+    git push -u "$remote" "$branch_proto" >/dev/null 2>&1 || true
+  fi
+
+  git config "branch.$branch_proto.parent" "$curr" 2>/dev/null || true
+
+  git reset --hard "$good_commit" || return $?
+
+  if (( push == 1 )); then
+    git push --force-with-lease "$remote" "$curr:$curr" || true
+  fi
+
+  echo "✓ '$branch_proto' -> current HEAD"
+  echo "✓ '$curr' reset to $good_commit"
+}
+
