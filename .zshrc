@@ -91,6 +91,11 @@ alias ls='ls --color=auto'
 alias gtree='git ls-tree -r --name-only HEAD | tree --fromfile'
 alias docker-killall='docker stop $(docker ps -a -q)'
 alias docker-removeall='docker rm $(docker ps -a -q)'
+alias code="code-insiders"
+################ ENV VARS ################
+
+export DOTENV_ALWAYS_LOAD=1
+
 
 ################ API KEYS ################
 # Load local environment if available
@@ -177,3 +182,27 @@ fpath=(/Users/oli/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
+
+# bun completions
+[ -s "/Users/oli/.bun/_bun" ] && source "/Users/oli/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# 1Password sssh
+export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
+
+# Added by Antigravity
+export PATH="/Users/oli/.antigravity/antigravity/bin:$PATH"
+
+# pnpm
+export PNPM_HOME="/Users/oli/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
