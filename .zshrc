@@ -59,7 +59,8 @@ zinit snippet OMZP::npm
 zinit snippet OMZP::dotenv
 zinit snippet OMZP::ansible
 zinit snippet OMZP::1password
-
+zinit snippet OMZP::jj
+source <(COMPLETE=zsh jj)
 # Load completions
 autoload -U compinit && compinit
 
@@ -146,6 +147,7 @@ add_to_path "$HOME/.modular/bin"
 add_to_path "$HOME/.lmstudio/bin"
 add_to_path "$HOME/.codeium/windsurf/bin"
 add_to_path "$HOME/.dotnet/tools"
+add_to_path "$HOME/.dotnet/"
 
 ################ SHELL INTEGRATION ################
 eval "$(fzf --zsh)"
@@ -206,3 +208,16 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+
+# TODO: Maybe move this into the wsl/linux config?
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$DOTNET_ROOT:$PATH"
+export PATH="$PATH:$HOME/.dotnet/tools"
+export PATH="$HOME/.local/bin:$PATH"
+
+# Start gnome-keyring for secret storage
+if [ -z "$GNOME_KEYRING_CONTROL" ]; then
+    eval $(gnome-keyring-daemon --start --components=secrets 2>/dev/null)
+    export GNOME_KEYRING_CONTROL
+fi
+alias uijj='lazyjj'
