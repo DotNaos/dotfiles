@@ -150,7 +150,9 @@ add_to_path "$HOME/.dotnet/tools"
 add_to_path "$HOME/.dotnet/"
 
 ################ SHELL INTEGRATION ################
-eval "$(fzf --zsh)"
+if [[ "$OSTYPE" == darwin* ]]; then
+  eval "$(fzf --zsh)"
+fi
 eval "$(uv generate-shell-completion zsh)"
 eval "$(uvx --generate-shell-completion zsh)"
 
