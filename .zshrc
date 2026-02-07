@@ -12,6 +12,13 @@ elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
     # Linux Linuxbrew (user-specific)
     eval "$($HOME/.linuxbrew/bin/brew shellenv)"
 fi
+
+# Auto-start tmux for interactive shells
+if [[ -z "$TMUX" && -n "$PS1" && -t 1 ]]; then
+  if command -v tmux >/dev/null 2>&1; then
+    exec tmux new-session -A -s main
+  fi
+fi
 # Zinit plugin directory
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
