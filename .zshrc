@@ -232,8 +232,7 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
-<<<<<<< Conflict 1 of 1
-+++++++ Contents of side #1
+
 
 # TODO: Maybe move this into the wsl/linux config?
 export DOTNET_ROOT="$HOME/.dotnet"
@@ -255,3 +254,24 @@ export PATH="$PATH:/Users/oli/go/bin"
 # moodle-cli completions
 autoload -Uz compinit && compinit
 source <(moodle completion zsh)
+
+# Go bin path for moodle-cli
+export PATH="$PATH:/Users/oli/go/bin"
+
+# moodle-cli completions
+autoload -Uz compinit && compinit
+source <(moodle completion zsh)
+
+
+ # TODO: Maybe move this into the wsl/linux config?
+ export DOTNET_ROOT="$HOME/.dotnet"
+ export PATH="$DOTNET_ROOT:$PATH"
+ export PATH="$PATH:$HOME/.dotnet/tools"
+ export PATH="$HOME/.local/bin:$PATH"
+
+ # Start gnome-keyring for secret storage
+ if [ -z "$GNOME_KEYRING_CONTROL" ]; then
+     eval $(gnome-keyring-daemon --start --components=secrets 2>/dev/null)
+     export GNOME_KEYRING_CONTROL
+ fi
+ alias uijj='lazyjj'
