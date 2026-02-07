@@ -69,6 +69,11 @@ zinit snippet OMZP::1password
 zinit snippet OMZP::jj
 source <(COMPLETE=zsh jj)
 # Load completions
+# Enable numeric (alphanumerical) sorting in completion
+zstyle ':completion:*' sort false
+zstyle ':completion:*' file-sort numerical
+zstyle ':completion:*' list-suffixes true
+
 autoload -U compinit && compinit
 
 zinit cdreplay -q
@@ -100,6 +105,15 @@ alias gtree='git ls-tree -r --name-only HEAD | tree --fromfile'
 alias docker-killall='docker stop $(docker ps -a -q)'
 alias docker-removeall='docker rm $(docker ps -a -q)'
 alias code="code-insiders"
+
+pls() {
+    local prompt="$*"
+    if [[ -z "$prompt" ]]; then
+        echo "Usage: pls <prompt>"
+        return 1
+    fi
+    command codex --dangerously-bypass-approvals-and-sandbox "$prompt"
+}
 ################ ENV VARS ################
 
 export DOTENV_ALWAYS_LOAD=1
@@ -206,6 +220,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # 1Password sssh
 export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
+export DOTENV_CONFIG_AUTO=1
 
 # Added by Antigravity
 export PATH="/Users/oli/.antigravity/antigravity/bin:$PATH"
@@ -217,6 +232,8 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+<<<<<<< Conflict 1 of 1
++++++++ Contents of side #1
 
 # TODO: Maybe move this into the wsl/linux config?
 export DOTNET_ROOT="$HOME/.dotnet"
@@ -230,3 +247,11 @@ if [ -z "$GNOME_KEYRING_CONTROL" ]; then
     export GNOME_KEYRING_CONTROL
 fi
 alias uijj='lazyjj'
+
+
+# Go bin path for moodle-cli
+export PATH="$PATH:/Users/oli/go/bin"
+
+# moodle-cli completions
+autoload -Uz compinit && compinit
+source <(moodle completion zsh)

@@ -5,6 +5,9 @@
 # automated terminals).
 # -------------------------------------------------------------
 
+# OS CLI completions
+fpath=("$HOME/.zsh/completions" $fpath)
+
 # ---- zoxide --------------------------------------------------
 if command -v zoxide &>/dev/null; then
   eval "$(zoxide init --cmd cd zsh)"
