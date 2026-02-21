@@ -1,1 +1,2 @@
-# TODO: Move all aliases here.
+# Optional per-user aliases.
+# Core aliases now live in .zshrc.d/20-aliases.zsh.

@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_DIR="$ROOT_DIR/install"
+
+ONLY=""
+DRY_RUN=0
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/bootstrap [--only macos|linux|wsl] [--dry-run]
+
+Options:
+  --only <platform>   Restrict install steps to one platform
+  --dry-run           Print actions without executing
+  -h, --help          Show this help
+USAGE
+}
+
+log() {
+  printf '[bootstrap] %s\n' "$*"
+}
+
+run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run: $*"
+  else
+    eval "$*"
+  fi
+}
+
+detect_platform() {
+  if [[ "${OSTYPE:-}" == darwin* ]]; then
+    echo "macos"
+    return
+  fi
+
+  if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+    echo "wsl"
+    return
+  fi
+
+  if [[ -r /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "wsl"
+    return
+  fi
+
+  echo "linux"
+}
+
+install_macos() {
+  local brewfile="$INSTALL_DIR/Brewfile"
+  if ! command -v brew >/dev/null 2>&1 && [[ "$DRY_RUN" -ne 1 ]]; then
+    log "Homebrew not found. Install brew first, then rerun bootstrap."
+    return 1
+  fi
+
+  if [[ ! -f "$brewfile" ]]; then
+    log "Missing Brewfile: $brewfile"
+    return 1
+  fi
+
+  run "brew bundle --file '$brewfile'"
+}
+
+install_wsl() {
+  local pkg_file="$INSTALL_DIR/wsl-packages.txt"
+
+  if ! command -v apt-get >/dev/null 2>&1 && [[ "$DRY_RUN" -ne 1 ]]; then
+    log "apt-get not found. This WSL bootstrap assumes Ubuntu/Debian."
+    return 1
+  fi
+
+  if [[ ! -f "$pkg_file" ]]; then
+    log "Missing package list: $pkg_file"
+    return 1
+  fi
+
+  run "sudo apt-get update"
+  run "xargs -a '$pkg_file' sudo apt-get install -y"
+}
+
+install_linux() {
+  log "No native Linux package manifest yet. Skipping system package install."
+}
+
+check_common_tools() {
+  local tools_file="$INSTALL_DIR/common-tools.txt"
+  local missing=()
+
+  [[ -f "$tools_file" ]] || return 0
+
+  while IFS= read -r tool || [[ -n "$tool" ]]; do
+    tool="${tool%%#*}"
+    tool="$(printf '%s' "$tool" | xargs)"
+    [[ -z "$tool" ]] && continue
+
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      missing+=("$tool")
+    fi
+  done < "$tools_file"
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    log "All commands in common-tools manifest are available."
+    return 0
+  fi
+
+  log "Missing commands from common-tools manifest:"
+  for cmd in "${missing[@]}"; do
+    log "  - $cmd"
+  done
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --only)
+      ONLY="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      log "Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+PLATFORM="$(detect_platform)"
+TARGET="${ONLY:-$PLATFORM}"
+
+case "$TARGET" in
+  macos|linux|wsl) ;;
+  *)
+    log "Invalid --only value: $TARGET"
+    usage
+    exit 1
+    ;;
+esac
+
+log "Detected platform: $PLATFORM"
+log "Target platform: $TARGET"
+
+case "$TARGET" in
+  macos)
+    install_macos
+    ;;
+  wsl)
+    install_wsl
+    ;;
+  linux)
+    install_linux
+    ;;
+esac
+
+check_common_tools
+
+log "Done."

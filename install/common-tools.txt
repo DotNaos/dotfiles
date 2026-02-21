@@ -1,0 +1,18 @@
+# Commands expected by the zsh modules and integrations
+zsh
+git
+fzf
+rg
+fd
+starship
+zoxide
+uv
+uvx
+jj
+bun
+pnpm
+go
+rbenv
+thefuck
+docker
+moodle
