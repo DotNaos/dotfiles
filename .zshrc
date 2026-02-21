@@ -203,7 +203,7 @@ if [[ "$TERM" == "xterm-ghostty" ]]; then
 fi
 export PATH="$HOME/.local/bin:$PATH"
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/oli/.docker/completions $fpath)
+fpath=("$HOME/.docker/completions" $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
@@ -211,7 +211,7 @@ compinit
 [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
 
 # bun completions
-[ -s "/Users/oli/.bun/_bun" ] && source "/Users/oli/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
@@ -223,10 +223,10 @@ export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/
 export DOTENV_CONFIG_AUTO=1
 
 # Added by Antigravity
-export PATH="/Users/oli/.antigravity/antigravity/bin:$PATH"
+export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
 
 # pnpm
-export PNPM_HOME="/Users/oli/Library/pnpm"
+export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
@@ -249,14 +249,14 @@ alias uijj='lazyjj'
 
 
 # Go bin path for moodle-cli
-export PATH="$PATH:/Users/oli/go/bin"
+export PATH="$PATH:$HOME/go/bin"
 
 # moodle-cli completions
 autoload -Uz compinit && compinit
 source <(moodle completion zsh)
 
 # Go bin path for moodle-cli
-export PATH="$PATH:/Users/oli/go/bin"
+export PATH="$PATH:$HOME/go/bin"
 
 # moodle-cli completions
 autoload -Uz compinit && compinit
