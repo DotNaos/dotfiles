@@ -20,6 +20,9 @@ fi
 # Load Zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
+# Keep this file minimal (bootstrap/loader only).
+# Put all regular configuration in modules under ~/.zshrc.d/.
+
 # Load modular shell config files in lexical order
 ZSHRC_D="${ZDOTDIR:-$HOME}/.zshrc.d"
 if [[ -d "$ZSHRC_D" ]]; then
