@@ -1,4 +1,4 @@
-module wt-new
+module worktree
 
 go 1.22
 

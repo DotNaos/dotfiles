@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"wt-new/internal/app"
+	"worktree/internal/app"
 )
 
 func main() {

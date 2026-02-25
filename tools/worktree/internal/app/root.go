@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,41 +12,121 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct {
+type newOptions struct {
 	branch string
 	base   string
 	clean  bool
+	cd     bool
+}
+
+type switchOptions struct {
+	cd bool
 }
 
 func NewRootCommand() *cobra.Command {
-	opts := &options{}
-
 	cmd := &cobra.Command{
-		Use:               "wt-new --branch <name> [--base <ref>]",
-		Short:             "Create a Git worktree with optional local file copy",
-		Args:              cobra.RangeArgs(0, 2),
-		ValidArgsFunction: completePositionalBaseRef,
-		RunE:              runWithOptions(opts),
-		Example: strings.Join([]string{
-			"  wt-new --branch feature/AT-123",
-			"  wt-new --branch feature/AT-123 --base main",
-			"  wt-new --branch feature/AT-123 --clean",
-			"  wt-new feature/AT-123 main  # legacy positional form",
-		}, "\n"),
+		Use:   "worktree",
+		Short: "Manage Git worktrees",
+		Long:  "Create and switch between Git worktrees.",
 	}
 
-	cmd.Flags().StringVar(&opts.branch, "branch", "", "New branch name (required)")
-	cmd.Flags().StringVarP(&opts.base, "base", "b", "", "Base branch/ref (default: current branch)")
-	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Create only tracked files (skip local-only copy)")
-	_ = cmd.RegisterFlagCompletionFunc("branch", completeBranchFlag)
-	_ = cmd.RegisterFlagCompletionFunc("base", completeBaseFlag)
+	cmd.AddCommand(newNewCommand())
+	cmd.AddCommand(newSwitchCommand())
+	cmd.AddCommand(newListCommand())
 	cmd.AddCommand(newCompletionCommand(cmd))
 	cmd.SetHelpCommand(&cobra.Command{Hidden: true})
 
 	return cmd
 }
 
-func runWithOptions(opts *options) func(cmd *cobra.Command, args []string) error {
+func newListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List branches that currently have worktrees",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			src, err := gitTopLevel()
+			if err != nil {
+				return errors.New("not inside a git repository")
+			}
+
+			for _, branch := range listWorktreeBranches(src) {
+				fmt.Println(branch)
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func newNewCommand() *cobra.Command {
+	opts := &newOptions{}
+
+	cmd := &cobra.Command{
+		Use:               "new --branch <name> [--base <ref>]",
+		Aliases:           []string{"create", "add"},
+		Short:             "Create a Git worktree with optional local file copy",
+		Args:              cobra.RangeArgs(0, 2),
+		ValidArgsFunction: completePositionalBaseRef,
+		RunE:              runNewWithOptions(opts),
+		Example: strings.Join([]string{
+			"  worktree new --branch feature/AT-123",
+			"  worktree new --branch feature/AT-123 --base main",
+			"  worktree new --branch feature/AT-123 --clean",
+			"  worktree new --branch feature/AT-123 --cd",
+			"  worktree new feature/AT-123 main  # legacy positional form",
+			"  eval \"$(worktree new --branch feature/AT-123 --cd)\"",
+		}, "\n"),
+	}
+
+	cmd.Flags().StringVar(&opts.branch, "branch", "", "New branch name (required)")
+	cmd.Flags().StringVarP(&opts.base, "base", "b", "", "Base branch/ref (default: current branch)")
+	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Create only tracked files (skip local-only copy)")
+	cmd.Flags().BoolVar(&opts.cd, "cd", false, "Print a shell cd command for the created worktree (for eval)")
+	_ = cmd.RegisterFlagCompletionFunc("branch", completeBranchFlag)
+	_ = cmd.RegisterFlagCompletionFunc("base", completeBaseFlag)
+
+	return cmd
+}
+
+func newSwitchCommand() *cobra.Command {
+	opts := &switchOptions{}
+
+	cmd := &cobra.Command{
+		Use:               "switch <branch-or-path>",
+		Aliases:           []string{"cd"},
+		Short:             "Resolve an existing worktree by branch or path",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeSwitchTarget,
+		RunE: func(_ *cobra.Command, args []string) error {
+			target, err := resolveSwitchTarget(args[0])
+			if err != nil {
+				return err
+			}
+
+			if opts.cd {
+				fmt.Printf("cd %s\n", shellQuote(target))
+				return nil
+			}
+
+			fmt.Println(target)
+			return nil
+		},
+		Example: strings.Join([]string{
+			"  worktree switch feature/AT-123",
+			"  worktree switch ../myrepo.worktrees/feature-AT-123",
+			"  eval \"$(worktree switch feature/AT-123 --cd)\"",
+		}, "\n"),
+	}
+
+	cmd.Flags().BoolVar(&opts.cd, "cd", false, "Print a shell cd command for the resolved worktree (for eval)")
+
+	return cmd
+}
+
+func runNewWithOptions(opts *newOptions) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		branch := strings.TrimSpace(opts.branch)
 		if len(args) > 0 {
@@ -67,7 +148,7 @@ func runWithOptions(opts *options) func(cmd *cobra.Command, args []string) error
 			base = strings.TrimSpace(args[len(args)-1])
 		}
 
-		return run(branch, base, opts.clean)
+		return runNew(branch, base, opts.clean, opts.cd)
 	}
 }
 
@@ -85,8 +166,6 @@ func completePositionalBaseRef(_ *cobra.Command, args []string, toComplete strin
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	// For UX, suggest existing refs even for the first argument.
-	// Users can still type any new branch name freely.
 	return filterByPrefix(listGitRefs(src), toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -102,7 +181,16 @@ func completeGitRefs(toComplete string) ([]string, cobra.ShellCompDirective) {
 	return filterByPrefix(listGitRefs(src), toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
-func run(branch, base string, clean bool) error {
+func completeSwitchTarget(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	src, err := gitTopLevel()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return filterByPrefix(listWorktreeBranches(src), toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+func runNew(branch, base string, clean, cd bool) error {
 	src, err := gitTopLevel()
 	if err != nil {
 		return errors.New("not inside a git repository")
@@ -122,7 +210,7 @@ func run(branch, base string, clean bool) error {
 		return err
 	}
 
-	if err := addWorktree(src, dst, branch, base, branchAlreadyExists); err != nil {
+	if err := addWorktree(src, dst, branch, base, branchAlreadyExists, cd); err != nil {
 		return err
 	}
 
@@ -130,6 +218,11 @@ func run(branch, base string, clean bool) error {
 		if err := copyLocalOnlyFiles(src, dst); err != nil {
 			return err
 		}
+	}
+
+	if cd {
+		fmt.Printf("cd %s\n", shellQuote(dst))
+		return nil
 	}
 
 	fmt.Printf("✅ Worktree created: %s\n", dst)
@@ -177,12 +270,128 @@ func ensureWorktreeTarget(wtRoot, dst string) error {
 	return nil
 }
 
-func addWorktree(src, dst, branch, base string, branchAlreadyExists bool) error {
+func addWorktree(src, dst, branch, base string, branchAlreadyExists, quiet bool) error {
 	if branchAlreadyExists {
+		if quiet {
+			return runCmdQuiet("", "git", "-C", src, "worktree", "add", dst, branch)
+		}
 		return runCmd("", "git", "-C", src, "worktree", "add", dst, branch)
 	}
 
+	if quiet {
+		return runCmdQuiet("", "git", "-C", src, "worktree", "add", dst, "-b", branch, base)
+	}
 	return runCmd("", "git", "-C", src, "worktree", "add", dst, "-b", branch, base)
+}
+
+func resolveSwitchTarget(target string) (string, error) {
+	if target == "" {
+		return "", errors.New("missing switch target")
+	}
+
+	src, err := gitTopLevel()
+	if err != nil {
+		return "", errors.New("not inside a git repository")
+	}
+
+	// Prefer branch lookup from actual `git worktree list` output,
+	// even when the branch name contains '/'.
+	if path := findWorktreePathByBranch(src, target); path != "" {
+		return path, nil
+	}
+
+	if strings.ContainsRune(target, os.PathSeparator) || target == "." || target == ".." {
+		abs, err := filepath.Abs(target)
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Stat(abs); err != nil {
+			return "", fmt.Errorf("worktree path not found: %s", abs)
+		}
+		return abs, nil
+	}
+
+	return "", fmt.Errorf("worktree not found for target: %s", target)
+}
+
+func findWorktreePathByBranch(src, branch string) string {
+	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
+	if err != nil {
+		return ""
+	}
+
+	var currentPath string
+	needle := "refs/heads/" + branch
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			currentPath = ""
+			continue
+		}
+		if strings.HasPrefix(line, "worktree ") {
+			currentPath = strings.TrimSpace(strings.TrimPrefix(line, "worktree "))
+			continue
+		}
+		if line == "branch "+needle {
+			return currentPath
+		}
+	}
+
+	return ""
+}
+
+func listWorktreePaths(src string) []string {
+	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil
+	}
+
+	var paths []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "worktree ") {
+			paths = append(paths, strings.TrimSpace(strings.TrimPrefix(line, "worktree ")))
+		}
+	}
+	return paths
+}
+
+func listWorktreeBranches(src string) []string {
+	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil
+	}
+
+	allRefs := listGitRefs(src)
+	refSet := make(map[string]struct{}, len(allRefs))
+	for _, ref := range allRefs {
+		refSet[ref] = struct{}{}
+	}
+
+	seen := map[string]struct{}{}
+	var branches []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "branch refs/heads/") {
+			continue
+		}
+
+		branch := strings.TrimPrefix(line, "branch refs/heads/")
+		if branch == "" {
+			continue
+		}
+		if _, ok := refSet[branch]; !ok {
+			continue
+		}
+		if _, ok := seen[branch]; ok {
+			continue
+		}
+
+		seen[branch] = struct{}{}
+		branches = append(branches, branch)
+	}
+
+	return branches
 }
 
 func gitTopLevel() (string, error) {
@@ -233,7 +442,6 @@ func copyLocalOnlyFiles(src, dst string) error {
 }
 
 func copyLocalOnlyFilesFallback(src, dst string) error {
-
 	out, err := runCmdOutput("", "git", "-C", src, "ls-files", "-z", "--others", "--ignored", "--exclude-standard")
 	if err != nil {
 		return err
@@ -298,6 +506,13 @@ func filterByPrefix(values []string, prefix string) []string {
 	return filtered
 }
 
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
 func runCmd(dir, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	if dir != "" {
@@ -306,6 +521,19 @@ func runCmd(dir, name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func runCmdQuiet(dir, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command failed: %s %s", name, strings.Join(args, " "))
+	}
+	return nil
 }
 
 func runCmdOutput(dir, name string, args ...string) (string, error) {

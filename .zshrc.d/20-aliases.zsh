@@ -8,5 +8,6 @@ alias docker-killall='docker stop $(docker ps -a -q)'
 alias docker-removeall='docker rm $(docker ps -a -q)'
 alias code='code-insiders'
 alias uijj='lazyjj'
+alias wt='worktree'
 
 safe_source "${ZDOTDIR:-$HOME}/.zsh_aliases"
