@@ -1,0 +1,4 @@
+version: 1
+display_name: Worktree CLI
+short_description: Maintain and extend custom Git worktree CLI + zsh UX
+default_prompt: Improve or add features to the custom worktree CLI, shell wrapper flows, and workspace sync behavior while keeping base-worktree semantics consistent.

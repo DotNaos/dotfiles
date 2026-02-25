@@ -1,12 +1,14 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,6 +25,22 @@ type switchOptions struct {
 	cd bool
 }
 
+type listOptions struct {
+	plain bool
+}
+
+type removeOptions struct {
+	branch string
+	path   string
+	force  bool
+}
+
+type worktreeInfo struct {
+	path   string
+	branch string
+	main   bool
+}
+
 func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "worktree",
@@ -33,6 +51,8 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newNewCommand())
 	cmd.AddCommand(newSwitchCommand())
 	cmd.AddCommand(newListCommand())
+	cmd.AddCommand(newRemoveCommand())
+	cmd.AddCommand(newSyncCommand())
 	cmd.AddCommand(newCompletionCommand(cmd))
 	cmd.SetHelpCommand(&cobra.Command{Hidden: true})
 
@@ -40,6 +60,8 @@ func NewRootCommand() *cobra.Command {
 }
 
 func newListCommand() *cobra.Command {
+	opts := &listOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List branches that currently have worktrees",
@@ -50,13 +72,20 @@ func newListCommand() *cobra.Command {
 				return errors.New("not inside a git repository")
 			}
 
-			for _, branch := range listWorktreeBranches(src) {
-				fmt.Println(branch)
+			for _, info := range listWorktrees(src) {
+				if opts.plain || !info.main {
+					fmt.Println(info.branch)
+					continue
+				}
+
+				fmt.Printf("* %s (main)\n", info.branch)
 			}
 
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.plain, "plain", false, "Print only raw branch names")
 
 	return cmd
 }
@@ -126,6 +155,70 @@ func newSwitchCommand() *cobra.Command {
 	return cmd
 }
 
+func newRemoveCommand() *cobra.Command {
+	opts := &removeOptions{}
+
+	cmd := &cobra.Command{
+		Use:               "remove [branch-or-path]",
+		Aliases:           []string{"rm", "delete"},
+		Short:             "Remove an existing worktree by branch or path",
+		Args:              cobra.RangeArgs(0, 1),
+		ValidArgsFunction: completeSwitchTarget,
+		RunE:              runRemoveWithOptions(opts),
+		Example: strings.Join([]string{
+			"  worktree remove feature/AT-123",
+			"  worktree remove --branch feature/AT-123",
+			"  worktree remove --path ../myrepo.worktrees/feature-AT-123",
+			"  worktree remove --force feature/AT-123",
+		}, "\n"),
+	}
+
+	cmd.Flags().StringVar(&opts.branch, "branch", "", "Branch name whose worktree should be removed")
+	cmd.Flags().StringVar(&opts.path, "path", "", "Exact worktree path to remove")
+	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force removal even with uncommitted changes")
+	_ = cmd.RegisterFlagCompletionFunc("branch", completeSwitchTarget)
+	_ = cmd.RegisterFlagCompletionFunc("path", completeWorktreePath)
+
+	return cmd
+}
+
+func newSyncCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "sync",
+		Short: "Sync existing worktrees into VS Code workspace folders",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			src, err := gitTopLevel()
+			if err != nil {
+				return errors.New("not inside a git repository")
+			}
+
+			baseRoot := mainWorktreePath(src)
+			if baseRoot == "" {
+				return errors.New("could not resolve main worktree root")
+			}
+
+			workspaceFile := firstWorkspaceFile(baseRoot)
+			if workspaceFile == "" {
+				fmt.Println("No .code-workspace file found in main worktree root; nothing to sync.")
+				return nil
+			}
+
+			infos := listWorktrees(baseRoot)
+			for _, info := range infos {
+				if err := updateWorkspaceFolders(baseRoot, info.path, true); err != nil {
+					return err
+				}
+			}
+
+			fmt.Printf("✅ Workspace synced: %s\n", workspaceFile)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 func runNewWithOptions(opts *newOptions) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		branch := strings.TrimSpace(opts.branch)
@@ -186,8 +279,76 @@ func completeSwitchTarget(_ *cobra.Command, _ []string, toComplete string) ([]st
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+	src = baseWorktreeRoot(src)
 
 	return filterByPrefix(listWorktreeBranches(src), toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeWorktreePath(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	src, err := gitTopLevel()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	src = baseWorktreeRoot(src)
+
+	return filterByPrefix(listWorktreePaths(src), toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+func runRemoveWithOptions(opts *removeOptions) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		src, err := gitTopLevel()
+		if err != nil {
+			return errors.New("not inside a git repository")
+		}
+		src = baseWorktreeRoot(src)
+
+		branch := strings.TrimSpace(opts.branch)
+		path := strings.TrimSpace(opts.path)
+
+		if len(args) > 0 {
+			if cmd.Flags().Changed("branch") || cmd.Flags().Changed("path") {
+				return errors.New("target specified both positionally and via --branch/--path")
+			}
+
+			resolved, resolveErr := resolveSwitchTarget(args[0])
+			if resolveErr != nil {
+				return resolveErr
+			}
+			path = resolved
+		} else {
+			if branch != "" && path != "" {
+				return errors.New("use only one of --branch or --path")
+			}
+
+			if branch != "" {
+				resolved := findWorktreePathByBranch(src, branch)
+				if resolved == "" {
+					return fmt.Errorf("worktree not found for branch: %s", branch)
+				}
+				path = resolved
+			}
+
+			if path == "" {
+				return errors.New("missing target (use positional, --branch, or --path)")
+			}
+
+			abs, absErr := filepath.Abs(path)
+			if absErr == nil {
+				path = abs
+			}
+		}
+
+		if err := removeWorktree(src, path, opts.force); err != nil {
+			return err
+		}
+
+		if err := updateWorkspaceFolders(src, path, false); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to update VS Code workspace: %v\n", err)
+		}
+
+		fmt.Printf("✅ Worktree removed: %s\n", path)
+		return nil
+	}
 }
 
 func runNew(branch, base string, clean, cd bool) error {
@@ -195,6 +356,7 @@ func runNew(branch, base string, clean, cd bool) error {
 	if err != nil {
 		return errors.New("not inside a git repository")
 	}
+	src = baseWorktreeRoot(src)
 
 	branchAlreadyExists, base, err := resolveBranchAndBase(src, branch, base)
 	if err != nil {
@@ -218,6 +380,10 @@ func runNew(branch, base string, clean, cd bool) error {
 		if err := copyLocalOnlyFiles(src, dst); err != nil {
 			return err
 		}
+	}
+
+	if err := updateWorkspaceFolders(src, dst, true); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to update VS Code workspace: %v\n", err)
 	}
 
 	if cd {
@@ -284,6 +450,21 @@ func addWorktree(src, dst, branch, base string, branchAlreadyExists, quiet bool)
 	return runCmd("", "git", "-C", src, "worktree", "add", dst, "-b", branch, base)
 }
 
+func removeWorktree(src, path string, force bool) error {
+	if force {
+		if err := runCmd("", "git", "-C", src, "worktree", "remove", "--force", path); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err := runCmd("", "git", "-C", src, "worktree", "remove", path); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func resolveSwitchTarget(target string) (string, error) {
 	if target == "" {
 		return "", errors.New("missing switch target")
@@ -293,6 +474,7 @@ func resolveSwitchTarget(target string) (string, error) {
 	if err != nil {
 		return "", errors.New("not inside a git repository")
 	}
+	src = baseWorktreeRoot(src)
 
 	// Prefer branch lookup from actual `git worktree list` output,
 	// even when the branch name contains '/'.
@@ -315,25 +497,9 @@ func resolveSwitchTarget(target string) (string, error) {
 }
 
 func findWorktreePathByBranch(src, branch string) string {
-	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
-	if err != nil {
-		return ""
-	}
-
-	var currentPath string
-	needle := "refs/heads/" + branch
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			currentPath = ""
-			continue
-		}
-		if strings.HasPrefix(line, "worktree ") {
-			currentPath = strings.TrimSpace(strings.TrimPrefix(line, "worktree "))
-			continue
-		}
-		if line == "branch "+needle {
-			return currentPath
+	for _, info := range listWorktrees(src) {
+		if info.branch == branch {
+			return info.path
 		}
 	}
 
@@ -357,8 +523,8 @@ func listWorktreePaths(src string) []string {
 }
 
 func listWorktreeBranches(src string) []string {
-	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
-	if err != nil {
+	infos := listWorktrees(src)
+	if len(infos) == 0 {
 		return nil
 	}
 
@@ -370,28 +536,336 @@ func listWorktreeBranches(src string) []string {
 
 	seen := map[string]struct{}{}
 	var branches []string
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "branch refs/heads/") {
+	for _, info := range infos {
+		if info.branch == "" {
+			continue
+		}
+		if _, ok := refSet[info.branch]; !ok {
+			continue
+		}
+		if _, ok := seen[info.branch]; ok {
 			continue
 		}
 
-		branch := strings.TrimPrefix(line, "branch refs/heads/")
-		if branch == "" {
-			continue
-		}
-		if _, ok := refSet[branch]; !ok {
-			continue
-		}
-		if _, ok := seen[branch]; ok {
-			continue
-		}
-
-		seen[branch] = struct{}{}
-		branches = append(branches, branch)
+		seen[info.branch] = struct{}{}
+		branches = append(branches, info.branch)
 	}
 
 	return branches
+}
+
+func listWorktrees(src string) []worktreeInfo {
+	out, err := runCmdOutput("", "git", "-C", src, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil
+	}
+
+	mainPath := mainWorktreePath(src)
+
+	var infos []worktreeInfo
+	var current worktreeInfo
+	flush := func() {
+		if current.path != "" && current.branch != "" {
+			infos = append(infos, current)
+		}
+		current = worktreeInfo{}
+	}
+
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			flush()
+			continue
+		}
+
+		if strings.HasPrefix(line, "worktree ") {
+			current.path = strings.TrimSpace(strings.TrimPrefix(line, "worktree "))
+			current.main = (mainPath != "" && current.path == mainPath)
+			continue
+		}
+
+		if strings.HasPrefix(line, "branch refs/heads/") {
+			current.branch = strings.TrimPrefix(line, "branch refs/heads/")
+			continue
+		}
+	}
+	flush()
+
+	return infos
+}
+
+func mainWorktreePath(src string) string {
+	out, err := runCmdOutput("", "git", "-C", src, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return ""
+	}
+
+	gitCommonDir := strings.TrimSpace(out)
+	if gitCommonDir == "" {
+		return ""
+	}
+
+	return filepath.Dir(gitCommonDir)
+}
+
+func baseWorktreeRoot(src string) string {
+	mainRoot := mainWorktreePath(src)
+	if mainRoot == "" {
+		return src
+	}
+
+	return mainRoot
+}
+
+func updateWorkspaceFolders(src, worktreePath string, add bool) error {
+	// TODO: Move workspace sync behavior behind user config (e.g. ~/.config/worktree/config.*)
+	// and disable it by default; later expose an explicit CLI flag to enable it.
+	workspaceFile := firstWorkspaceFile(src)
+	if workspaceFile == "" {
+		return nil
+	}
+
+	content, err := os.ReadFile(workspaceFile)
+	if err != nil {
+		return err
+	}
+
+	parsed := sanitizeWorkspaceJSON(content)
+
+	var root map[string]any
+	if err := json.Unmarshal(parsed, &root); err != nil {
+		return err
+	}
+
+	workspaceDir := filepath.Dir(workspaceFile)
+	targetAbs, err := filepath.Abs(worktreePath)
+	if err != nil {
+		return err
+	}
+
+	entries := folderEntries(root["folders"])
+	if add {
+		entries = addFolderEntry(entries, workspaceDir, targetAbs)
+	} else {
+		entries = removeFolderEntry(entries, workspaceDir, targetAbs)
+	}
+
+	root["folders"] = entriesToAny(entries)
+
+	updated, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	updated = append(updated, '\n')
+	return os.WriteFile(workspaceFile, updated, 0o644)
+}
+
+func sanitizeWorkspaceJSON(content []byte) []byte {
+	noComments := stripLineComments(content)
+	return stripTrailingCommas(noComments)
+}
+
+func stripLineComments(content []byte) []byte {
+	var out []byte
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+
+		if inString {
+			out = append(out, ch)
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		if ch == '"' {
+			inString = true
+			out = append(out, ch)
+			continue
+		}
+
+		if ch == '/' && i+1 < len(content) && content[i+1] == '/' {
+			for i < len(content) && content[i] != '\n' {
+				i++
+			}
+			if i < len(content) {
+				out = append(out, content[i])
+			}
+			continue
+		}
+
+		out = append(out, ch)
+	}
+
+	return out
+}
+
+func stripTrailingCommas(content []byte) []byte {
+	out := make([]byte, 0, len(content))
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+
+		if inString {
+			out = append(out, ch)
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		if ch == '"' {
+			inString = true
+			out = append(out, ch)
+			continue
+		}
+
+		if ch == ',' {
+			j := i + 1
+			for j < len(content) {
+				next := content[j]
+				if next == ' ' || next == '\t' || next == '\n' || next == '\r' {
+					j++
+					continue
+				}
+				break
+			}
+			if j < len(content) && (content[j] == ']' || content[j] == '}') {
+				continue
+			}
+		}
+
+		out = append(out, ch)
+	}
+
+	return out
+}
+
+func firstWorkspaceFile(baseRoot string) string {
+	if strings.TrimSpace(baseRoot) == "" {
+		return ""
+	}
+
+	files, err := filepath.Glob(filepath.Join(baseRoot, "*.code-workspace"))
+	if err != nil || len(files) == 0 {
+		return ""
+	}
+
+	sort.Strings(files)
+	return files[0]
+}
+
+type workspaceFolderEntry struct {
+	name string
+	path string
+}
+
+func folderEntries(value any) []workspaceFolderEntry {
+	rawFolders, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+
+	var entries []workspaceFolderEntry
+	for _, item := range rawFolders {
+		asMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		pathValue, _ := asMap["path"].(string)
+		if strings.TrimSpace(pathValue) == "" {
+			continue
+		}
+
+		entry := workspaceFolderEntry{path: pathValue}
+		if name, ok := asMap["name"].(string); ok {
+			entry.name = name
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+func addFolderEntry(entries []workspaceFolderEntry, workspaceDir, targetAbs string) []workspaceFolderEntry {
+	for _, entry := range entries {
+		if sameFolderTarget(workspaceDir, entry.path, targetAbs) {
+			return entries
+		}
+	}
+
+	entryPath := toWorkspacePath(workspaceDir, targetAbs)
+	return append(entries, workspaceFolderEntry{path: entryPath})
+}
+
+func removeFolderEntry(entries []workspaceFolderEntry, workspaceDir, targetAbs string) []workspaceFolderEntry {
+	filtered := make([]workspaceFolderEntry, 0, len(entries))
+	for _, entry := range entries {
+		if sameFolderTarget(workspaceDir, entry.path, targetAbs) {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
+}
+
+func entriesToAny(entries []workspaceFolderEntry) []any {
+	items := make([]any, 0, len(entries))
+	for _, entry := range entries {
+		item := map[string]any{"path": entry.path}
+		if entry.name != "" {
+			item["name"] = entry.name
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func sameFolderTarget(workspaceDir, configuredPath, targetAbs string) bool {
+	resolved := configuredPath
+	if !filepath.IsAbs(resolved) {
+		resolved = filepath.Join(workspaceDir, resolved)
+	}
+
+	resolvedAbs, err := filepath.Abs(resolved)
+	if err != nil {
+		return false
+	}
+
+	return filepath.Clean(resolvedAbs) == filepath.Clean(targetAbs)
+}
+
+func toWorkspacePath(workspaceDir, targetAbs string) string {
+	rel, err := filepath.Rel(workspaceDir, targetAbs)
+	if err != nil {
+		return targetAbs
+	}
+
+	return rel
 }
 
 func gitTopLevel() (string, error) {
@@ -422,19 +896,19 @@ func defaultBase(src string) (string, error) {
 }
 
 func refExists(src, ref string) bool {
-	err := runCmd("", "git", "-C", src, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	err := runCmdQuiet("", "git", "-C", src, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
 	return err == nil
 }
 
 func localBranchExists(src, branch string) bool {
-	err := runCmd("", "git", "-C", src, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	err := runCmdQuiet("", "git", "-C", src, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
 	return err == nil
 }
 
 func copyLocalOnlyFiles(src, dst string) error {
 	rs, err := exec.LookPath("rsync")
 	if err == nil && rs != "" {
-		cmd := fmt.Sprintf("git -C %q ls-files -z --others --ignored --exclude-standard | rsync -a --from0 --files-from=- --exclude '.git' --exclude '.jj' --exclude 'node_modules' --exclude 'bin' --exclude 'obj' %q/ %q/", src, src, dst)
+		cmd := fmt.Sprintf("git -C %q ls-files -z --others --ignored --exclude-standard | while IFS= read -r -d '' rel; do case \"$rel\" in .git|.git/*|.jj|.jj/*|node_modules|node_modules/*|bin|bin/*|obj|obj/*) ;; *) printf '%%s\\0' \"$rel\" ;; esac; done | rsync -a --from0 --files-from=- --ignore-missing-args %q/ %q/", src, src, dst)
 		return runCmd("", "bash", "-lc", cmd)
 	}
 
@@ -455,6 +929,13 @@ func copyLocalOnlyFilesFallback(src, dst string) error {
 		srcPath := filepath.Join(src, rel)
 		dstPath := filepath.Join(dst, rel)
 
+		if _, err := os.Stat(srcPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 			return err
 		}
@@ -467,6 +948,10 @@ func copyLocalOnlyFilesFallback(src, dst string) error {
 }
 
 func isExcludedLocalPath(rel string) bool {
+	rel = strings.TrimSpace(rel)
+	rel = strings.TrimPrefix(rel, "./")
+	rel = strings.TrimPrefix(rel, "/")
+
 	excludedPrefixes := []string{".git", ".jj", "node_modules", "bin", "obj"}
 	for _, prefix := range excludedPrefixes {
 		if rel == prefix || strings.HasPrefix(rel, prefix+"/") {

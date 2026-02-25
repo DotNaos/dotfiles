@@ -97,7 +97,7 @@ worktree() {
     if (( $# == 0 )); then
       if has fzf; then
         local selected_branch
-        selected_branch="$(command worktree list | fzf --prompt='worktree> ' --height=40% --reverse)" || return $?
+        selected_branch="$(command worktree list --plain | fzf --prompt='worktree> ' --height=40% --reverse)" || return $?
         [[ -n "$selected_branch" ]] || return 1
         eval "$(command worktree switch --cd "$selected_branch")"
         return $?
@@ -128,6 +128,27 @@ worktree() {
     fi
 
     [[ -n "$output" ]] && eval "$output"
+    return $?
+  fi
+
+  if [[ "$1" == "remove" || "$1" == "rm" || "$1" == "delete" ]]; then
+    local subcommand="$1"
+    shift
+
+    if (( $# == 0 )); then
+      if has fzf; then
+        local selected_branch
+        selected_branch="$(command worktree list --plain | fzf --prompt='remove worktree> ' --height=40% --reverse)" || return $?
+        [[ -n "$selected_branch" ]] || return 1
+        command worktree "$subcommand" --branch "$selected_branch"
+        return $?
+      fi
+
+      echo "worktree remove: missing target (use argument/--branch/--path, or install fzf)" >&2
+      return 1
+    fi
+
+    command worktree "$subcommand" "$@"
     return $?
   fi
 
