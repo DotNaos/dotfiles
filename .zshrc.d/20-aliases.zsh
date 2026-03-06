@@ -2,6 +2,7 @@
 
 alias cls='clear'
 alias c='clear'
+alias clipboard='pbcopy'
 alias ls='ls --color=auto'
 alias gtree='git ls-tree -r --name-only HEAD | tree --fromfile'
 alias docker-killall='docker stop $(docker ps -a -q)'
