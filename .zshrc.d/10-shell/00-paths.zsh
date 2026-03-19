@@ -12,6 +12,7 @@ append_path_once "$HOME/.codeium/windsurf/bin"
 append_path_once "$HOME/.antigravity/antigravity/bin"
 append_path_once "$HOME/.bun/bin"
 append_path_once "$HOME/go/bin"
+append_path_once "$HOME/.local/google-cloud-sdk/bin"
 
 case "$DOTFILES_PLATFORM" in
   macos)

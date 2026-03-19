@@ -6,10 +6,12 @@ DOTFILES_WORKTREE_BIN="${DOTFILES_WORKTREE_BIN:-$HOME/.local/bin/worktree}"
 worktree_needs_build() {
   [[ -x "$DOTFILES_WORKTREE_BIN" ]] || return 0
 
-  find "$DOTFILES_WORKTREE_ROOT" -type f \
+  [[ -n "$(
+    find "$DOTFILES_WORKTREE_ROOT" -type f \
     \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' \) \
     -newer "$DOTFILES_WORKTREE_BIN" \
-    -print -quit 2>/dev/null | grep -q .
+    -print -quit 2>/dev/null
+  )" ]]
 }
 
 ensure_worktree_installed() {

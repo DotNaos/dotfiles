@@ -21,9 +21,7 @@ zinit snippet OMZP::thefuck
 zinit snippet OMZP::vscode
 zinit snippet OMZP::poetry
 zinit snippet OMZP::npm
-zinit snippet OMZP::dotenv
 zinit snippet OMZP::ansible
-zinit snippet OMZP::1password
 zinit snippet OMZP::jj
 
 zinit cdreplay -q
@@ -43,17 +41,6 @@ setopt hist_ignore_all_dups
 setopt hist_ignore_dups
 setopt hist_save_no_dups
 setopt hist_find_no_dups
-
-export DOTENV_ALWAYS_LOAD=1
-export DOTENV_CONFIG_AUTO=1
-
-safe_source "$HOME/.local/bin/env"
-
-if [[ -f "$HOME/.env" ]]; then
-  set -a
-  source "$HOME/.env"
-  set +a
-fi
 
 if has rbenv; then
   eval "$(rbenv init - zsh)"
