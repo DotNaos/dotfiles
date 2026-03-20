@@ -1,0 +1,17 @@
+# Commands expected after a rootless bootstrap on Linux/WSL.
+zsh
+git
+fzf
+rg
+fd
+tmux
+starship
+zoxide
+uv
+uvx
+jj
+bun
+pnpm
+go
+rbenv
+thefuck

@@ -6,13 +6,15 @@ INSTALL_DIR="$ROOT_DIR/install"
 
 ONLY=""
 DRY_RUN=0
+ROOTLESS=0
 
 usage() {
   cat <<USAGE
-Usage: ./scripts/bootstrap [--only macos|linux|wsl] [--dry-run]
+Usage: ./scripts/bootstrap [--only macos|linux|wsl] [--rootless] [--dry-run]
 
 Options:
   --only <platform>   Restrict install steps to one platform
+  --rootless          Use a user-local install profile for Linux/WSL
   --dry-run           Print actions without executing
   -h, --help          Show this help
 USAGE
@@ -47,6 +49,36 @@ detect_platform() {
   fi
 
   echo "linux"
+}
+
+rootless_brew_prefix() {
+  printf '%s\n' "${DOTFILES_ROOTLESS_BREW_PREFIX:-$HOME/.linuxbrew}"
+}
+
+rootless_brew_bin() {
+  printf '%s/bin/brew\n' "$(rootless_brew_prefix)"
+}
+
+ensure_rootless_homebrew() {
+  local brew_prefix brew_repo brew_bin
+
+  brew_prefix="$(rootless_brew_prefix)"
+  brew_repo="$brew_prefix/Homebrew"
+  brew_bin="$(rootless_brew_bin)"
+
+  if [[ -x "$brew_bin" ]]; then
+    return 0
+  fi
+
+  run "mkdir -p '$brew_repo' '$brew_prefix/bin'"
+
+  if [[ ! -d "$brew_repo/.git" ]]; then
+    run "git clone https://github.com/Homebrew/brew '$brew_repo'"
+  fi
+
+  if [[ ! -e "$brew_bin" ]]; then
+    run "ln -sf '../Homebrew/bin/brew' '$brew_bin'"
+  fi
 }
 
 install_macos() {
@@ -85,9 +117,27 @@ install_linux() {
   log "No native Linux package manifest yet. Skipping system package install."
 }
 
+install_rootless_linux() {
+  local brewfile="$INSTALL_DIR/Brewfile.rootless"
+  local brew_bin
+
+  if [[ ! -f "$brewfile" ]]; then
+    log "Missing rootless Brewfile: $brewfile"
+    return 1
+  fi
+
+  ensure_rootless_homebrew
+  brew_bin="$(rootless_brew_bin)"
+  run "'$brew_bin' bundle --file '$brewfile'"
+}
+
 check_common_tools() {
   local tools_file="$INSTALL_DIR/common-tools.txt"
   local missing=()
+
+  if [[ "$ROOTLESS" -eq 1 ]]; then
+    tools_file="$INSTALL_DIR/common-tools-rootless.txt"
+  fi
 
   [[ -f "$tools_file" ]] || return 0
 
@@ -122,6 +172,10 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=1
       shift
       ;;
+    --rootless)
+      ROOTLESS=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -148,16 +202,31 @@ esac
 
 log "Detected platform: $PLATFORM"
 log "Target platform: $TARGET"
+if [[ "$ROOTLESS" -eq 1 ]]; then
+  log "Install profile: rootless"
+fi
 
 case "$TARGET" in
   macos)
+    if [[ "$ROOTLESS" -eq 1 ]]; then
+      log "Rootless profile is only supported for linux and wsl."
+      exit 1
+    fi
     install_macos
     ;;
   wsl)
-    install_wsl
+    if [[ "$ROOTLESS" -eq 1 ]]; then
+      install_rootless_linux
+    else
+      install_wsl
+    fi
     ;;
   linux)
-    install_linux
+    if [[ "$ROOTLESS" -eq 1 ]]; then
+      install_rootless_linux
+    else
+      install_linux
+    fi
     ;;
 esac
 
