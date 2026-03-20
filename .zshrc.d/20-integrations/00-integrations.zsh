@@ -2,6 +2,10 @@
 
 zinit ice depth=1
 
+# This is the advised way for loading completions.
+# For a list of available completion plugins, see
+# https://github.com/ohmyzsh/ohmyzsh/wiki/plugins
+
 zinit snippet OMZP::git
 zinit snippet OMZP::sudo
 zinit snippet OMZP::archlinux
@@ -23,6 +27,11 @@ zinit snippet OMZP::poetry
 zinit snippet OMZP::npm
 zinit snippet OMZP::ansible
 zinit snippet OMZP::jj
+zinit snippet OMZP::dotenv
+zinit snippet OMZP::fzf
+zinit snippet OMZP::git-extras
+
+
 
 zinit cdreplay -q
 

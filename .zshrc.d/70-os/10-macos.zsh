@@ -2,6 +2,10 @@
 
 [[ "$DOTFILES_PLATFORM" == "macos" ]] || return 0
 
+if [[ -x "/Applications/Blender.app/Contents/MacOS/Blender" ]]; then
+  append_path_once "/Applications/Blender.app/Contents/MacOS"
+fi
+
 if [[ "$TERM" == "xterm-ghostty" ]]; then
   export TERM=xterm-256color
 fi

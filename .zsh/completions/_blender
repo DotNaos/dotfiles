@@ -1,0 +1,111 @@
+#compdef blender Blender
+
+_blender() {
+  local -a engines devices formats
+  engines=(
+    help
+    BLENDER_EEVEE
+    CYCLES
+    WORKBENCH
+  )
+  devices=(
+    CPU
+    CUDA
+    OPTIX
+    HIP
+    ONEAPI
+    METAL
+  )
+  formats=(
+    TGA
+    RAWTGA
+    JPEG
+    IRIS
+    AVIRAW
+    AVIJPEG
+    PNG
+    BMP
+    HDR
+    TIFF
+    OPEN_EXR
+    OPEN_EXR_MULTILAYER
+    FFMPEG
+    CINEON
+    DPX
+    JP2
+    WEBP
+  )
+
+  _arguments -s -S -C \
+    '-b[run in background]' \
+    '--background[run in background]' \
+    '-a[render the full animation range]' \
+    '--render-anim[render the full animation range]' \
+    '-S+[set the active scene]:scene name:' \
+    '--scene+[set the active scene]:scene name:' \
+    '-f+[render a frame or frame list]:frame:' \
+    '--render-frame+[render a frame or frame list]:frame:' \
+    '-s+[set the start frame]:frame:' \
+    '--frame-start+[set the start frame]:frame:' \
+    '-e+[set the end frame]:frame:' \
+    '--frame-end+[set the end frame]:frame:' \
+    '-j+[set the frame step]:frame step:' \
+    '--frame-jump+[set the frame step]:frame step:' \
+    '-o+[set the render output path]:output path:_files' \
+    '--render-output+[set the render output path]:output path:_files' \
+    '-E+[set the render engine]:engine:('"${engines[*]}"')' \
+    '--engine+[set the render engine]:engine:('"${engines[*]}"')' \
+    '-t+[set thread count]:threads:' \
+    '--threads+[set thread count]:threads:' \
+    '-F+[set the render format]:format:('"${formats[*]}"')' \
+    '--render-format+[set the render format]:format:('"${formats[*]}"')' \
+    '-x+[toggle automatic file extension]:bool:(0 1)' \
+    '--use-extension+[toggle automatic file extension]:bool:(0 1 true false)' \
+    '-w[force window borders]' \
+    '--window-border[force window borders]' \
+    '-W[force fullscreen window]' \
+    '--window-fullscreen[force fullscreen window]' \
+    '-p+[set playback window geometry]:geometry:' \
+    '--window-geometry+[set playback window geometry]:geometry:' \
+    '-M[force maximized window]' \
+    '--window-maximized[force maximized window]' \
+    '--no-native-pixels[disable native pixel scaling]' \
+    '--no-window-focus[open without taking focus]' \
+    '-y[enable automatic Python execution]' \
+    '--enable-autoexec[enable automatic Python execution]' \
+    '-Y[disable automatic Python execution]' \
+    '--disable-autoexec[disable automatic Python execution]' \
+    '-P+[run a Python file]:python file:_files -g "*.py"' \
+    '--python+[run a Python file]:python file:_files -g "*.py"' \
+    '--python-text+[run a Blender text block]:text block name:' \
+    '--python-expr+[run an inline Python expression]:expression:' \
+    '--python-console[start an interactive Python console]' \
+    '--python-exit-code+[set the exit code on Python errors]:exit code:' \
+    '--python-use-system-env[allow system Python environment variables]' \
+    '--addons+[enable additional add-ons]:add-ons:' \
+    '--online-mode[allow internet access]' \
+    '--offline-mode[disallow internet access]' \
+    '--log+[enable logging categories]:category:' \
+    '--log-level+[set logging verbosity]:level:' \
+    '--log-show-basename[show only file names in logs]' \
+    '--log-show-backtrace[show backtraces in logs]' \
+    '--log-show-timestamp[show timestamps in logs]' \
+    '--log-file+[write logs to a file]:log file:_files' \
+    '-d[enable debug mode]' \
+    '--debug[enable debug mode]' \
+    '--debug-value+[set a debug value]:value:' \
+    '--debug-events[enable event debug logging]' \
+    '--debug-ffmpeg[enable FFmpeg debug logging]' \
+    '--debug-handlers[enable handler debug logging]' \
+    '--debug-libmv[enable libmv debug logging]' \
+    '--cycles-device+[set the Cycles render device]:device:('"${devices[*]}"' "${^devices[@]/#/+CPU}")' \
+    '--cycles-print-stats[print Cycles memory and timing stats]' \
+    '-h[show help]' \
+    '--help[show help]' \
+    '-v[show version]' \
+    '--version[show version]' \
+    ':blend file:_files -g "*.blend"' \
+    '*::extra files:_files'
+}
+
+_blender "$@"

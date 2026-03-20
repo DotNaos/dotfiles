@@ -31,6 +31,7 @@ unset _toolkit_completion
 
 load_completion_if_cmd jj eval 'source <(COMPLETE=zsh jj)'
 load_completion_if_cmd moodle eval 'source <(moodle completion zsh)'
+load_completion_if_cmd codex eval 'eval "$(codex completion zsh)"'
 load_completion_if_cmd uv eval 'eval "$(uv generate-shell-completion zsh)"'
 load_completion_if_cmd uvx eval 'eval "$(uvx --generate-shell-completion zsh)"'
 if has worktree; then
