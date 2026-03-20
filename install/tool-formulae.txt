@@ -13,3 +13,4 @@ go
 thefuck
 tree
 gh
+nvim

@@ -6,7 +6,6 @@ TARGET_HOME="${HOME}"
 DRY_RUN=0
 
 LINK_ITEMS=(
-  ".config"
   ".jj"
   ".tmux.conf"
   ".zsh"
@@ -43,6 +42,37 @@ run() {
 ensure_parent_dir() {
   local target_path="$1"
   run "mkdir -p '$(dirname "$target_path")'"
+}
+
+link_config_tree() {
+  local source_root="$ROOT_DIR/.config"
+  local target_root="$TARGET_HOME/.config"
+  local source_path relative_path target_path
+
+  [[ -d "$source_root" ]] || return 0
+
+  run "mkdir -p '$target_root'"
+
+  while IFS= read -r source_path; do
+    relative_path="${source_path#"$source_root"/}"
+    target_path="$target_root/$relative_path"
+
+    if [[ -L "$target_path" ]]; then
+      local current_target
+      current_target="$(readlink "$target_path")"
+      if [[ "$current_target" == "$source_path" ]]; then
+        log "Already linked: .config/$relative_path"
+        continue
+      fi
+    elif [[ -e "$target_path" ]]; then
+      log "Skipping existing non-symlink path: $target_path"
+      continue
+    fi
+
+    ensure_parent_dir "$target_path"
+    run "ln -sfn '$source_path' '$target_path'"
+    log "Linked .config/$relative_path"
+  done < <(find "$source_root" -mindepth 1 -maxdepth 1 | sort)
 }
 
 link_item() {
@@ -99,6 +129,8 @@ if [[ -z "$TARGET_HOME" ]]; then
   log "Target home must not be empty."
   exit 1
 fi
+
+link_config_tree
 
 for item in "${LINK_ITEMS[@]}"; do
   link_item "$item"
