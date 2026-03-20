@@ -125,6 +125,25 @@ rootless_zsh_shim() {
   printf '%s/.local/bin/zsh\n' "$HOME"
 }
 
+enter_rootless_zsh_now() {
+  local zsh_shim
+
+  [[ "$DRY_RUN" -eq 0 ]] || return 0
+  [[ -t 0 && -t 1 ]] || return 0
+  [[ "$ROOTLESS" -eq 1 ]] || return 0
+  [[ "$TARGET" == "linux" || "$TARGET" == "wsl" ]] || return 0
+
+  zsh_shim="$(rootless_zsh_shim)"
+  [[ -x "$zsh_shim" ]] || return 0
+
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    return 0
+  fi
+
+  log "Starting local zsh for this session."
+  exec "$zsh_shim" -l
+}
+
 append_managed_block() {
   local target_file="$1"
   local block_name="$2"
@@ -401,3 +420,5 @@ if [[ "$ROOTLESS" -eq 1 && ( "$TARGET" == "linux" || "$TARGET" == "wsl" ) ]]; th
 fi
 
 log "Done."
+
+enter_rootless_zsh_now
