@@ -121,6 +121,10 @@ rootless_zsh_bin() {
   printf '%s/bin/zsh\n' "$(rootless_brew_prefix)"
 }
 
+rootless_zsh_shim() {
+  printf '%s/.local/bin/zsh\n' "$HOME"
+}
+
 append_managed_block() {
   local target_file="$1"
   local block_name="$2"
@@ -183,15 +187,20 @@ PY
 }
 
 configure_rootless_zsh_shell() {
-  local zsh_bin profile_file profile_block current_shell chsh_cmd
+  local zsh_bin zsh_shim profile_file profile_block current_shell chsh_cmd
 
   zsh_bin="$(rootless_zsh_bin)"
+  zsh_shim="$(rootless_zsh_shim)"
   profile_file="$HOME/.profile"
 
   if [[ ! -x "$zsh_bin" && "$DRY_RUN" -ne 1 ]]; then
     log "Local zsh not found at $zsh_bin. Skipping shell switch."
     return 0
   fi
+
+  run "mkdir -p '${zsh_shim%/*}'"
+  run "ln -sfn '$zsh_bin' '$zsh_shim'"
+  log "Created zsh shortcut at $zsh_shim."
 
   current_shell="${SHELL:-}"
   if [[ "$current_shell" == "$zsh_bin" ]]; then
@@ -220,6 +229,7 @@ configure_rootless_zsh_shell() {
 
   append_managed_block "$profile_file" "rootless-zsh" "$profile_block"
   log "Interactive logins will now jump into $zsh_bin via ~/.profile."
+  log "To start it in the current session, run: $zsh_shim -l"
 }
 
 install_macos() {
