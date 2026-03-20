@@ -21,15 +21,21 @@ zinit snippet OMZP::python
 zinit snippet OMZP::pip
 zinit snippet OMZP::rust
 zinit snippet OMZP::ssh
-zinit snippet OMZP::thefuck
 zinit snippet OMZP::vscode
 zinit snippet OMZP::poetry
 zinit snippet OMZP::npm
 zinit snippet OMZP::ansible
 zinit snippet OMZP::jj
 zinit snippet OMZP::dotenv
-zinit snippet OMZP::fzf
 zinit snippet OMZP::git-extras
+
+if has thefuck; then
+  zinit snippet OMZP::thefuck
+fi
+
+if has fzf || [[ -d "${FZF_BASE:-}" ]] || [[ -d "$HOME/.fzf" ]] || [[ -d "/opt/homebrew/opt/fzf" ]] || [[ -d "/usr/local/opt/fzf" ]]; then
+  zinit snippet OMZP::fzf
+fi
 
 
 

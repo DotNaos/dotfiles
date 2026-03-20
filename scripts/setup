@@ -51,6 +51,18 @@ detect_platform() {
   echo "linux"
 }
 
+has_sudo_access() {
+  if ! command -v sudo >/dev/null 2>&1; then
+    return 1
+  fi
+
+  sudo -n true >/dev/null 2>&1
+}
+
+has_apt_get() {
+  command -v apt-get >/dev/null 2>&1
+}
+
 rootless_brew_prefix() {
   printf '%s\n' "${DOTFILES_ROOTLESS_BREW_PREFIX:-$HOME/.linuxbrew}"
 }
@@ -234,19 +246,27 @@ install_linux() {
 }
 
 install_rootless_linux() {
-  local brewfile="$INSTALL_DIR/Brewfile.rootless"
+  local formula_file="$INSTALL_DIR/rootless-formulae.txt"
   local brew_bin
+  local formula
 
-  if [[ ! -f "$brewfile" ]]; then
-    log "Missing rootless Brewfile: $brewfile"
+  if [[ ! -f "$formula_file" ]]; then
+    log "Missing rootless formula list: $formula_file"
     return 1
   fi
 
   ensure_rootless_homebrew
   brew_bin="$(rootless_brew_bin)"
   ensure_bun_tap "$brew_bin"
-  log "Installing the main package set with Homebrew."
-  run "'$brew_bin' bundle --file '$brewfile'"
+
+  while IFS= read -r formula || [[ -n "$formula" ]]; do
+    formula="${formula%%#*}"
+    formula="$(printf '%s' "$formula" | xargs)"
+    [[ -z "$formula" ]] && continue
+    log "Installing $formula with verbose output."
+    run "'$brew_bin' install -v '$formula'"
+  done < "$formula_file"
+
   log "Installing zsh last with verbose output. This can take a while on older Linux systems."
   run "'$brew_bin' install -v zsh"
 }
@@ -310,6 +330,13 @@ done
 
 PLATFORM="$(detect_platform)"
 TARGET="${ONLY:-$PLATFORM}"
+
+if [[ "$ROOTLESS" -eq 0 && ( "$TARGET" == "linux" || "$TARGET" == "wsl" ) ]]; then
+  if ! has_apt_get || ! has_sudo_access; then
+    ROOTLESS=1
+    log "No usable sudo-based package path detected. Falling back to rootless install."
+  fi
+fi
 
 case "$TARGET" in
   macos|linux|wsl) ;;

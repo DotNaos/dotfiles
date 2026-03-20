@@ -1,0 +1,13 @@
+starship
+tmux
+fzf
+ripgrep
+fd
+zoxide
+rbenv
+uv
+jj
+oven-sh/bun/bun
+pnpm
+go
+thefuck
