@@ -208,10 +208,15 @@ install_macos() {
 }
 
 install_wsl() {
+  install_apt_linux "WSL"
+}
+
+install_apt_linux() {
+  local platform_label="$1"
   local pkg_file="$INSTALL_DIR/wsl-packages.txt"
 
   if ! command -v apt-get >/dev/null 2>&1 && [[ "$DRY_RUN" -ne 1 ]]; then
-    log "apt-get not found. This WSL setup assumes Ubuntu/Debian."
+    log "apt-get not found. This $platform_label setup assumes Ubuntu/Debian."
     return 1
   fi
 
@@ -225,7 +230,7 @@ install_wsl() {
 }
 
 install_linux() {
-  log "No native Linux package manifest yet. Skipping system package install."
+  install_apt_linux "Linux"
 }
 
 install_rootless_linux() {

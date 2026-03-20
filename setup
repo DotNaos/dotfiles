@@ -9,6 +9,10 @@ DRY_RUN=0
 EXPLICIT_MODE=0
 ARGS=()
 
+log() {
+  printf '[setup-entry] %s\n' "$*"
+}
+
 detect_platform() {
   if [[ "${OSTYPE:-}" == darwin* ]]; then
     echo "macos"
@@ -28,6 +32,27 @@ detect_platform() {
   echo "linux"
 }
 
+has_sudo_access() {
+  if ! command -v sudo >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if sudo -n true >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" -eq 1 || ! -t 0 ]]; then
+    return 1
+  fi
+
+  log "Checking sudo access to choose setup path."
+  sudo -v >/dev/null 2>&1
+}
+
+has_apt_get() {
+  command -v apt-get >/dev/null 2>&1
+}
+
 for arg in "$@"; do
   if [[ "$arg" == "--dry-run" ]]; then
     DRY_RUN=1
@@ -42,8 +67,19 @@ done
 
 if [[ "$EXPLICIT_MODE" -eq 0 ]]; then
   case "$(detect_platform)" in
-    linux|wsl)
-      ARGS+=("--only" "linux" "--rootless")
+    wsl)
+      if has_apt_get && has_sudo_access; then
+        ARGS+=("--only" "wsl")
+      else
+        ARGS+=("--only" "wsl" "--rootless")
+      fi
+      ;;
+    linux)
+      if has_apt_get && has_sudo_access; then
+        ARGS+=("--only" "linux")
+      else
+        ARGS+=("--only" "linux" "--rootless")
+      fi
       ;;
   esac
 fi
