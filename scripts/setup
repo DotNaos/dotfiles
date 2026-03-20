@@ -98,6 +98,25 @@ ensure_bun_tap() {
   run "'$brew_bin' tap oven-sh/bun"
 }
 
+install_brew_formulae() {
+  local brew_bin="$1"
+  local formula_file="$2"
+  local formula
+
+  if [[ ! -f "$formula_file" ]]; then
+    log "Missing formula list: $formula_file"
+    return 1
+  fi
+
+  while IFS= read -r formula || [[ -n "$formula" ]]; do
+    formula="${formula%%#*}"
+    formula="$(printf '%s' "$formula" | xargs)"
+    [[ -z "$formula" ]] && continue
+    log "Installing $formula with verbose output."
+    run "'$brew_bin' install -v '$formula'"
+  done < "$formula_file"
+}
+
 rootless_zsh_bin() {
   printf '%s/bin/zsh\n' "$(rootless_brew_prefix)"
 }
@@ -204,19 +223,16 @@ configure_rootless_zsh_shell() {
 }
 
 install_macos() {
-  local brewfile="$INSTALL_DIR/Brewfile"
+  local formula_file="$INSTALL_DIR/tool-formulae.txt"
   if ! command -v brew >/dev/null 2>&1 && [[ "$DRY_RUN" -ne 1 ]]; then
     log "Homebrew not found. Install brew first, then rerun setup."
     return 1
   fi
 
-  if [[ ! -f "$brewfile" ]]; then
-    log "Missing Brewfile: $brewfile"
-    return 1
-  fi
-
   ensure_bun_tap brew
-  run "brew bundle --file '$brewfile'"
+  run "brew install -v git"
+  install_brew_formulae brew "$formula_file"
+  run "brew install -v jandedobbeleer/oh-my-posh/oh-my-posh"
 }
 
 install_wsl() {
@@ -246,27 +262,18 @@ install_linux() {
 }
 
 install_rootless_linux() {
-  local formula_file="$INSTALL_DIR/rootless-formulae.txt"
+  local formula_file="$INSTALL_DIR/tool-formulae.txt"
   local brew_bin
-  local formula
 
   if [[ ! -f "$formula_file" ]]; then
-    log "Missing rootless formula list: $formula_file"
+    log "Missing shared tool formula list: $formula_file"
     return 1
   fi
 
   ensure_rootless_homebrew
   brew_bin="$(rootless_brew_bin)"
   ensure_bun_tap "$brew_bin"
-
-  while IFS= read -r formula || [[ -n "$formula" ]]; do
-    formula="${formula%%#*}"
-    formula="$(printf '%s' "$formula" | xargs)"
-    [[ -z "$formula" ]] && continue
-    log "Installing $formula with verbose output."
-    run "'$brew_bin' install -v '$formula'"
-  done < "$formula_file"
-
+  install_brew_formulae "$brew_bin" "$formula_file"
   log "Installing zsh last with verbose output. This can take a while on older Linux systems."
   run "'$brew_bin' install -v zsh"
 }

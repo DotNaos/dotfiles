@@ -11,3 +11,5 @@ oven-sh/bun/bun
 pnpm
 go
 thefuck
+tree
+gh
