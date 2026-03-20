@@ -26,16 +26,14 @@ Install the local tool set, including a local `zsh`:
   --rootless
 ```
 
-Start the locally installed `zsh`:
+What happens after install:
+
+- The setup tries to change your login shell to the local `zsh` automatically.
+- If the server blocks that, it adds a small fallback to `~/.profile` so new interactive logins jump into the local `zsh` anyway.
+- If you want to start it manually right away, run:
 
 ```bash
 ~/.linuxbrew/bin/zsh -l
-```
-
-If the server allows changing your login shell, you can try:
-
-```bash
-chsh -s ~/.linuxbrew/bin/zsh
 ```
 
 If you want a different install location:

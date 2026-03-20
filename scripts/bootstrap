@@ -81,6 +81,116 @@ ensure_rootless_homebrew() {
   fi
 }
 
+ensure_bun_tap() {
+  local brew_bin="${1:-brew}"
+  run "'$brew_bin' tap oven-sh/bun"
+}
+
+rootless_zsh_bin() {
+  printf '%s/bin/zsh\n' "$(rootless_brew_prefix)"
+}
+
+append_managed_block() {
+  local target_file="$1"
+  local block_name="$2"
+  local block_content="$3"
+  local start_marker="# >>> dotfiles $block_name >>>"
+  local end_marker="# <<< dotfiles $block_name <<<"
+
+  run "mkdir -p '$(dirname "$target_file")'"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run: update '$target_file' with managed block '$block_name'"
+    return 0
+  fi
+
+  touch "$target_file"
+
+  TARGET_FILE="$target_file" \
+  BLOCK_NAME="$block_name" \
+  BLOCK_CONTENT="$block_content" \
+  python3 - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["TARGET_FILE"])
+block_name = os.environ["BLOCK_NAME"]
+block_content = os.environ["BLOCK_CONTENT"].rstrip("\n")
+start = f"# >>> dotfiles {block_name} >>>"
+end = f"# <<< dotfiles {block_name} <<<"
+
+existing = path.read_text() if path.exists() else ""
+managed = f"{start}\n{block_content}\n{end}\n"
+
+lines = existing.splitlines()
+out = []
+i = 0
+replaced = False
+
+while i < len(lines):
+    if lines[i] == start:
+        i += 1
+        while i < len(lines) and lines[i] != end:
+            i += 1
+        if i < len(lines) and lines[i] == end:
+            i += 1
+        if out and out[-1] != "":
+            out.append("")
+        out.extend(managed.rstrip("\n").splitlines())
+        replaced = True
+        continue
+    out.append(lines[i])
+    i += 1
+
+if not replaced:
+    if out and out[-1] != "":
+        out.append("")
+    out.extend(managed.rstrip("\n").splitlines())
+
+path.write_text("\n".join(out).rstrip("\n") + "\n")
+PY
+}
+
+configure_rootless_zsh_shell() {
+  local zsh_bin profile_file profile_block current_shell chsh_cmd
+
+  zsh_bin="$(rootless_zsh_bin)"
+  profile_file="$HOME/.profile"
+
+  if [[ ! -x "$zsh_bin" && "$DRY_RUN" -ne 1 ]]; then
+    log "Local zsh not found at $zsh_bin. Skipping shell switch."
+    return 0
+  fi
+
+  current_shell="${SHELL:-}"
+  if [[ "$current_shell" == "$zsh_bin" ]]; then
+    log "Login shell already points to local zsh."
+  elif command -v chsh >/dev/null 2>&1; then
+    chsh_cmd="chsh -s '$zsh_bin'"
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      log "dry-run: attempt login shell change with: $chsh_cmd"
+    elif chsh -s "$zsh_bin" >/dev/null 2>&1; then
+      log "Login shell changed to $zsh_bin."
+      return 0
+    else
+      log "Could not change login shell automatically. Installing shell fallback in ~/.profile."
+    fi
+  else
+    log "chsh is not available. Installing shell fallback in ~/.profile."
+  fi
+
+  profile_block=$(printf '%s\n' \
+    "if [ -x \"$zsh_bin\" ] && [ -z \"\${ZSH_VERSION:-}\" ] && [ \"\${SHELL:-}\" != \"$zsh_bin\" ]; then" \
+    "  case \"\$-\" in" \
+    "    *i*) exec \"$zsh_bin\" -l ;;" \
+    "  esac" \
+    "fi")
+
+  append_managed_block "$profile_file" "rootless-zsh" "$profile_block"
+  log "Interactive logins will now jump into $zsh_bin via ~/.profile."
+}
+
 install_macos() {
   local brewfile="$INSTALL_DIR/Brewfile"
   if ! command -v brew >/dev/null 2>&1 && [[ "$DRY_RUN" -ne 1 ]]; then
@@ -93,6 +203,7 @@ install_macos() {
     return 1
   fi
 
+  ensure_bun_tap brew
   run "brew bundle --file '$brewfile'"
 }
 
@@ -128,6 +239,7 @@ install_rootless_linux() {
 
   ensure_rootless_homebrew
   brew_bin="$(rootless_brew_bin)"
+  ensure_bun_tap "$brew_bin"
   run "'$brew_bin' bundle --file '$brewfile'"
 }
 
@@ -231,5 +343,9 @@ case "$TARGET" in
 esac
 
 check_common_tools
+
+if [[ "$ROOTLESS" -eq 1 && ( "$TARGET" == "linux" || "$TARGET" == "wsl" ) ]]; then
+  configure_rootless_zsh_shell
+fi
 
 log "Done."
