@@ -1,4 +1,6 @@
 # Core CLI tooling
+tap "oven-sh/bun"
+
 brew "zsh"
 brew "git"
 brew "tmux"

@@ -1,36 +1,89 @@
 # Dotfiles
 
+## Rootless Ubuntu Server Setup
+
+Use this when you do not have `root` or `sudo` on the server.
+
+Clone the repo:
+
+```bash
+git clone <your-dotfiles-repo> ~/dotfiles
+cd ~/dotfiles
+```
+
+Link the dotfiles into your home directory:
+
+```bash
+# example if you use stow
+stow .
+```
+
+Install the local tool set, including a local `zsh`:
+
+```bash
+./scripts/bootstrap \
+  --only linux \
+  --rootless
+```
+
+Start the locally installed `zsh`:
+
+```bash
+~/.linuxbrew/bin/zsh -l
+```
+
+If the server allows changing your login shell, you can try:
+
+```bash
+chsh -s ~/.linuxbrew/bin/zsh
+```
+
+If you want a different install location:
+
+```bash
+DOTFILES_ROOTLESS_BREW_PREFIX="$HOME/somewhere/homebrew" \
+  ./scripts/bootstrap \
+  --only linux \
+  --rootless
+```
+
 ## Quickstart
 
 1. Clone this repository into your home directory.
 2. Ensure your dotfiles are linked into `$HOME` (manual symlinks or your stow workflow).
 3. Run bootstrap:
-   - Auto-detect platform: `./scripts/bootstrap`
-   - Only macOS: `./scripts/bootstrap --only macos`
-   - Only WSL: `./scripts/bootstrap --only wsl`
-   - Rootless Linux/WSL: `./scripts/bootstrap --only linux --rootless`
-   - Preview only: `./scripts/bootstrap --dry-run`
-4. Start a new shell session.
-
-## Rootless Linux / Ubuntu server
-
-Use this only when you cannot install packages system-wide:
+   - Auto-detect platform:
 
 ```bash
-./scripts/bootstrap --only linux --rootless
+./scripts/bootstrap
 ```
 
-What it does:
+   - Only macOS:
 
-- Installs Homebrew into `~/.linuxbrew`
-- Installs the rootless CLI tool set from `install/Brewfile.rootless`
-- Checks only the commands expected in the rootless profile
+```bash
+./scripts/bootstrap --only macos
+```
 
-Notes:
+   - Only WSL:
 
-- This does not change the default bootstrap path for macOS, WSL, or regular Linux.
-- If you cannot change your login shell on the server, start the local shell manually with `~/.linuxbrew/bin/zsh -l`.
-- If you prefer another prefix, set `DOTFILES_ROOTLESS_BREW_PREFIX` before running bootstrap.
+```bash
+./scripts/bootstrap --only wsl
+```
+
+   - Rootless Linux/WSL:
+
+```bash
+./scripts/bootstrap \
+  --only linux \
+  --rootless
+```
+
+   - Preview only:
+
+```bash
+./scripts/bootstrap --dry-run
+```
+4. Start a new shell session.
 
 ## Zsh layout
 
