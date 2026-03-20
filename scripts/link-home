@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_HOME="${HOME}"
+DRY_RUN=0
+
+LINK_ITEMS=(
+  ".config"
+  ".jj"
+  ".tmux.conf"
+  ".zsh"
+  ".zsh_aliases"
+  ".zshrc"
+  ".zshrc.d"
+  ".zshrc_functions"
+  ".zshrc_user"
+)
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/link-home [--dry-run] [--home PATH]
+
+Options:
+  --dry-run     Print actions without executing
+  --home PATH   Link into a different home directory
+  -h, --help    Show this help
+USAGE
+}
+
+log() {
+  printf '[link-home] %s\n' "$*"
+}
+
+run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run: $*"
+  else
+    eval "$*"
+  fi
+}
+
+ensure_parent_dir() {
+  local target_path="$1"
+  run "mkdir -p '$(dirname "$target_path")'"
+}
+
+link_item() {
+  local relative_path="$1"
+  local source_path="$ROOT_DIR/$relative_path"
+  local target_path="$TARGET_HOME/$relative_path"
+
+  if [[ ! -e "$source_path" ]]; then
+    log "Skipping missing source: $relative_path"
+    return 0
+  fi
+
+  ensure_parent_dir "$target_path"
+
+  if [[ -L "$target_path" ]]; then
+    local current_target
+    current_target="$(readlink "$target_path")"
+    if [[ "$current_target" == "$source_path" ]]; then
+      log "Already linked: $relative_path"
+      return 0
+    fi
+  elif [[ -e "$target_path" ]]; then
+    log "Skipping existing non-symlink path: $target_path"
+    return 0
+  fi
+
+  run "ln -sfn '$source_path' '$target_path'"
+  log "Linked $relative_path"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --home)
+      TARGET_HOME="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      log "Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$TARGET_HOME" ]]; then
+  log "Target home must not be empty."
+  exit 1
+fi
+
+for item in "${LINK_ITEMS[@]}"; do
+  link_item "$item"
+done
+
+log "Done."

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_SCRIPT="$ROOT_DIR/scripts/setup"
+LINK_SCRIPT="$ROOT_DIR/scripts/link-home"
+
+DRY_RUN=0
+EXPLICIT_MODE=0
+ARGS=()
+
+detect_platform() {
+  if [[ "${OSTYPE:-}" == darwin* ]]; then
+    echo "macos"
+    return
+  fi
+
+  if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+    echo "wsl"
+    return
+  fi
+
+  if [[ -r /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "wsl"
+    return
+  fi
+
+  echo "linux"
+}
+
+for arg in "$@"; do
+  if [[ "$arg" == "--dry-run" ]]; then
+    DRY_RUN=1
+  fi
+
+  if [[ "$arg" == "--rootless" || "$arg" == "--only" ]]; then
+    EXPLICIT_MODE=1
+  fi
+
+  ARGS+=("$arg")
+done
+
+if [[ "$EXPLICIT_MODE" -eq 0 ]]; then
+  case "$(detect_platform)" in
+    linux|wsl)
+      ARGS+=("--only" "linux" "--rootless")
+      ;;
+  esac
+fi
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  "$LINK_SCRIPT" --dry-run
+else
+  "$LINK_SCRIPT"
+fi
+
+exec "$SETUP_SCRIPT" "${ARGS[@]}"

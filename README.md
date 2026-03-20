@@ -1,87 +1,18 @@
 # Dotfiles
 
-## Rootless Ubuntu Server Setup
-
-Use this when you do not have `root` or `sudo` on the server.
-
-Clone the repo:
+1. Clone
 
 ```bash
-git clone <your-dotfiles-repo> ~/dotfiles
-cd ~/dotfiles
+git clone https://github.com/DotNaos/dotfiles.git ~/dotfiles
 ```
 
-Link the dotfiles into your home directory:
+1. Setup
+
+This automatically detects your platform and checks for sudo access to pick the right setup path for you.
 
 ```bash
-# example if you use stow
-stow .
+./dotfiles/setup
 ```
-
-Install the local tool set, including a local `zsh`:
-
-```bash
-./scripts/bootstrap \
-  --only linux \
-  --rootless
-```
-
-What happens after install:
-
-- The setup tries to change your login shell to the local `zsh` automatically.
-- If the server blocks that, it adds a small fallback to `~/.profile` so new interactive logins jump into the local `zsh` anyway.
-- If you want to start it manually right away, run:
-
-```bash
-~/.linuxbrew/bin/zsh -l
-```
-
-If you want a different install location:
-
-```bash
-DOTFILES_ROOTLESS_BREW_PREFIX="$HOME/somewhere/homebrew" \
-  ./scripts/bootstrap \
-  --only linux \
-  --rootless
-```
-
-## Quickstart
-
-1. Clone this repository into your home directory.
-2. Ensure your dotfiles are linked into `$HOME` (manual symlinks or your stow workflow).
-3. Run bootstrap:
-   - Auto-detect platform:
-
-```bash
-./scripts/bootstrap
-```
-
-   - Only macOS:
-
-```bash
-./scripts/bootstrap --only macos
-```
-
-   - Only WSL:
-
-```bash
-./scripts/bootstrap --only wsl
-```
-
-   - Rootless Linux/WSL:
-
-```bash
-./scripts/bootstrap \
-  --only linux \
-  --rootless
-```
-
-   - Preview only:
-
-```bash
-./scripts/bootstrap --dry-run
-```
-4. Start a new shell session.
 
 ## Zsh layout
 
@@ -133,7 +64,10 @@ Notes:
 Run after changes:
 
 ```bash
+bash -n setup
+bash -n scripts/setup
+bash -n scripts/link-home
 zsh -n .zshrc
 find .zshrc.d -type f -name '*.zsh' -print0 | xargs -0 -n1 zsh -n
-./scripts/bootstrap --dry-run
+./setup --dry-run
 ```
