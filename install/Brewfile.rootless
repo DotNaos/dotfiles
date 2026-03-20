@@ -1,7 +1,6 @@
 # User-local CLI tooling for Linux/WSL servers without sudo/root.
 tap "oven-sh/bun"
 
-brew "zsh"
 brew "git"
 brew "tmux"
 brew "fzf"

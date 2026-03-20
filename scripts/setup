@@ -245,8 +245,10 @@ install_rootless_linux() {
   ensure_rootless_homebrew
   brew_bin="$(rootless_brew_bin)"
   ensure_bun_tap "$brew_bin"
-  log "Installing packages with Homebrew. zsh can take several minutes on older Linux systems."
+  log "Installing the main package set with Homebrew."
   run "'$brew_bin' bundle --file '$brewfile'"
+  log "Installing zsh last with verbose output. This can take a while on older Linux systems."
+  run "'$brew_bin' install -v zsh"
 }
 
 check_common_tools() {
