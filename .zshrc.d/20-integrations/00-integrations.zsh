@@ -11,7 +11,6 @@ zinit snippet OMZP::sudo
 zinit snippet OMZP::archlinux
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
-zinit snippet OMZP::command-not-found
 zinit snippet OMZP::docker
 zinit snippet OMZP::docker-compose
 zinit snippet OMZP::brew
@@ -36,11 +35,6 @@ fi
 if has fzf || [[ -d "${FZF_BASE:-}" ]] || [[ -d "$HOME/.fzf" ]] || [[ -d "/opt/homebrew/opt/fzf" ]] || [[ -d "/usr/local/opt/fzf" ]]; then
   zinit snippet OMZP::fzf
 fi
-
-
-
-zinit cdreplay -q
-
 bindkey -e
 bindkey '^[[B' history-search-forward
 bindkey '^[[A' history-search-backward

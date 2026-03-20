@@ -8,6 +8,13 @@
 .fuse_hidden*
 .temp/
 .tmp/
+.tmp-*/
+.tmp-bin/
+.tmp-home/
+.tmp-test-home/
+
+# local build artifacts
+tools/dotfiles/dotfiles
 
 # KDE directory preferences
 .directory

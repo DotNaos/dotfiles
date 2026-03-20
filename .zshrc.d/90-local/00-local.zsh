@@ -12,6 +12,10 @@ fi
 
 safe_source "${ZDOTDIR:-$HOME}/.zshrc.local"
 
-if has zinit; then
+if type dotfiles_init_completions >/dev/null 2>&1; then
+  dotfiles_init_completions
+fi
+
+if has zinit && (( $+functions[compdef] )); then
   zinit cdreplay -q
 fi
