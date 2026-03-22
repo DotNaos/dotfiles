@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_HOME="${HOME}"
 DRY_RUN=0
+BACKUP_ROOT=""
+BACKUP_ROOT_ANNOUNCED=0
 
 LINK_ITEMS=(
   ".jj"
@@ -44,6 +46,35 @@ ensure_parent_dir() {
   run "mkdir -p '$(dirname "$target_path")'"
 }
 
+init_backup_root() {
+  [[ -n "$BACKUP_ROOT" ]] && return 0
+  BACKUP_ROOT="$TARGET_HOME/.dotfiles-backup/$(date +%Y%m%d-%H%M%S)"
+}
+
+announce_backup_root() {
+  if [[ "$BACKUP_ROOT_ANNOUNCED" -eq 1 ]]; then
+    return 0
+  fi
+
+  log "Backing up replaced paths into $BACKUP_ROOT"
+  BACKUP_ROOT_ANNOUNCED=1
+}
+
+backup_conflicting_path() {
+  local target_path="$1"
+  local backup_path
+
+  [[ -e "$target_path" || -L "$target_path" ]] || return 0
+
+  init_backup_root
+  backup_path="$BACKUP_ROOT/${target_path#"$TARGET_HOME"/}"
+
+  announce_backup_root
+  ensure_parent_dir "$backup_path"
+  run "mv '$target_path' '$backup_path'"
+  log "Backed up ${target_path#"$TARGET_HOME"/}"
+}
+
 link_config_tree() {
   local source_root="$ROOT_DIR/.config"
   local target_root="$TARGET_HOME/.config"
@@ -64,9 +95,10 @@ link_config_tree() {
         log "Already linked: .config/$relative_path"
         continue
       fi
-    elif [[ -e "$target_path" ]]; then
-      log "Skipping existing non-symlink path: $target_path"
-      continue
+    fi
+
+    if [[ -e "$target_path" || -L "$target_path" ]]; then
+      backup_conflicting_path "$target_path"
     fi
 
     ensure_parent_dir "$target_path"
@@ -94,9 +126,10 @@ link_item() {
       log "Already linked: $relative_path"
       return 0
     fi
-  elif [[ -e "$target_path" ]]; then
-    log "Skipping existing non-symlink path: $target_path"
-    return 0
+  fi
+
+  if [[ -e "$target_path" || -L "$target_path" ]]; then
+    backup_conflicting_path "$target_path"
   fi
 
   run "ln -sfn '$source_path' '$target_path'"
