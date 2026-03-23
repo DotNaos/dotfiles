@@ -227,3 +227,21 @@ proto-refactor() {
   (( had_leftovers == 1 )) && echo "✓ Leftovers committed to backup."
   echo "✓ Prototype synced & checked out: $proto"
 }
+
+# Open/switch to a tmux session tied to a folder path.
+t() {
+  local dir session
+  dir="${1:-$PWD}"
+  dir="$(cd "$dir" && pwd)" || return 1
+
+  session="$(printf '%s' "$dir" | sed 's#^/##; s#/#__#g; s#[^A-Za-z0-9_.-]#-#g')"
+  [[ -n "$session" ]] || session="root"
+
+  tmux has-session -t "$session" 2>/dev/null || tmux new-session -d -s "$session" -c "$dir"
+
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$session"
+  else
+    tmux attach-session -t "$session"
+  fi
+}
