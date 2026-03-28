@@ -40,23 +40,3 @@ safe_source() {
   [[ -r "$file" ]] || return 0
   source "$file"
 }
-
-load_completion_if_cmd() {
-  local cmd="$1"
-  local mode="$2"
-  local payload="$3"
-
-  has "$cmd" || return 0
-
-  case "$mode" in
-    eval)
-      eval "$payload"
-      ;;
-    source)
-      [[ -r "$payload" ]] && source "$payload"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}

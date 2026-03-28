@@ -1,5 +1,19 @@
 # Completion system and command-specific completions.
 
+dotfiles_load_generated_completion() {
+  local cmd="$1"
+  shift
+
+  local completion
+
+  has "$cmd" || return 0
+
+  completion="$("$@" 2>/dev/null)" || return 0
+  [[ -n "$completion" ]] || return 0
+
+  source /dev/stdin <<< "$completion"
+}
+
 dotfiles_init_completions() {
   [[ -n "${__DOTFILES_COMPLETIONS_DONE:-}" ]] && return 0
 
@@ -32,20 +46,13 @@ dotfiles_init_completions() {
   done
   unset _toolkit_completion
 
-  load_completion_if_cmd jj eval 'source <(COMPLETE=zsh jj)'
-  load_completion_if_cmd moodle eval 'source <(moodle completion zsh)'
-  load_completion_if_cmd codex eval 'eval "$(codex completion zsh)"'
-  load_completion_if_cmd dotfiles eval 'source <(dotfiles completion zsh)'
-  load_completion_if_cmd uv eval 'eval "$(uv generate-shell-completion zsh)"'
-  load_completion_if_cmd uvx eval 'eval "$(uvx --generate-shell-completion zsh)"'
-  if has worktree; then
-    typeset _worktree_completion
-    _worktree_completion="$(worktree completion zsh 2>/dev/null)"
-    if [[ -n "$_worktree_completion" ]]; then
-      source /dev/stdin <<< "$_worktree_completion"
-    fi
-    unset _worktree_completion
-  fi
+  dotfiles_load_generated_completion jj env COMPLETE=zsh jj
+  dotfiles_load_generated_completion moodle moodle completion zsh
+  dotfiles_load_generated_completion codex codex completion zsh
+  dotfiles_load_generated_completion dotfiles dotfiles completion zsh
+  dotfiles_load_generated_completion uv uv generate-shell-completion zsh
+  dotfiles_load_generated_completion uvx uvx --generate-shell-completion zsh
+  dotfiles_load_generated_completion worktree worktree completion zsh
 
   if [[ -s "$HOME/.bun/_bun" ]]; then
     source "$HOME/.bun/_bun"
