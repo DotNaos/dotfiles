@@ -16,6 +16,7 @@ This automatically detects your platform and checks for sudo access to pick the 
 
 ## Zsh layout
 
+- `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
 - `.zshrc` is now a thin loader.
 - Modules live in `.zshrc.d/` and load recursively in lexical path order.
 - Top-level folders define coarse order, files inside them define local order.
@@ -67,6 +68,7 @@ Run after changes:
 bash -n setup
 bash -n scripts/setup
 bash -n scripts/link-home
+zsh -n .zshenv
 zsh -n .zshrc
 find .zshrc.d -type f -name '*.zsh' -print0 | xargs -0 -n1 zsh -n
 ./setup --dry-run
