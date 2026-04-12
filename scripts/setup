@@ -71,6 +71,15 @@ rootless_brew_bin() {
   printf '%s/bin/brew\n' "$(rootless_brew_prefix)"
 }
 
+activate_brew_shellenv() {
+  local brew_bin="$1"
+
+  [[ "$DRY_RUN" -eq 0 ]] || return 0
+  [[ -x "$brew_bin" ]] || return 0
+
+  eval "$("$brew_bin" shellenv)"
+}
+
 ensure_rootless_homebrew() {
   local brew_prefix brew_repo brew_bin
 
@@ -117,30 +126,42 @@ install_brew_formulae() {
   done < "$formula_file"
 }
 
-rootless_zsh_bin() {
-  printf '%s/bin/zsh\n' "$(rootless_brew_prefix)"
+preferred_zsh_bin() {
+  local local_zsh
+
+  local_zsh="$(rootless_brew_prefix)/bin/zsh"
+  if [[ -x "$local_zsh" ]]; then
+    printf '%s\n' "$local_zsh"
+    return 0
+  fi
+
+  if command -v zsh >/dev/null 2>&1; then
+    command -v zsh
+    return 0
+  fi
+
+  printf '%s\n' "$local_zsh"
 }
 
-rootless_zsh_shim() {
+managed_zsh_shim() {
   printf '%s/.local/bin/zsh\n' "$HOME"
 }
 
-enter_rootless_zsh_now() {
+enter_configured_zsh_now() {
   local zsh_shim
 
   [[ "$DRY_RUN" -eq 0 ]] || return 0
   [[ -t 0 && -t 1 ]] || return 0
-  [[ "$ROOTLESS" -eq 1 ]] || return 0
   [[ "$TARGET" == "linux" || "$TARGET" == "wsl" ]] || return 0
 
-  zsh_shim="$(rootless_zsh_shim)"
+  zsh_shim="$(managed_zsh_shim)"
   [[ -x "$zsh_shim" ]] || return 0
 
   if [[ -n "${ZSH_VERSION:-}" ]]; then
     return 0
   fi
 
-  log "Starting local zsh for this session."
+  log "Starting zsh for this session."
   exec "$zsh_shim" -l
 }
 
@@ -205,15 +226,33 @@ path.write_text("\n".join(out).rstrip("\n") + "\n")
 PY
 }
 
-configure_rootless_zsh_shell() {
+configure_linuxbrew_shellenv() {
+  local brew_bin profile_file profile_block
+
+  brew_bin="$(rootless_brew_bin)"
+  profile_file="$HOME/.profile"
+
+  if [[ ! -x "$brew_bin" && "$DRY_RUN" -ne 1 ]]; then
+    return 0
+  fi
+
+  profile_block=$(printf '%s\n' \
+    "if [ -x \"$brew_bin\" ]; then" \
+    "  eval \"\$(\"$brew_bin\" shellenv)\"" \
+    "fi")
+
+  append_managed_block "$profile_file" "linuxbrew-shellenv" "$profile_block"
+}
+
+configure_zsh_shell() {
   local zsh_bin zsh_shim profile_file profile_block current_shell chsh_cmd
 
-  zsh_bin="$(rootless_zsh_bin)"
-  zsh_shim="$(rootless_zsh_shim)"
+  zsh_bin="$(preferred_zsh_bin)"
+  zsh_shim="$(managed_zsh_shim)"
   profile_file="$HOME/.profile"
 
   if [[ ! -x "$zsh_bin" && "$DRY_RUN" -ne 1 ]]; then
-    log "Local zsh not found at $zsh_bin. Skipping shell switch."
+    log "zsh not found at $zsh_bin. Skipping shell switch."
     return 0
   fi
 
@@ -221,9 +260,9 @@ configure_rootless_zsh_shell() {
   run "ln -sfn '$zsh_bin' '$zsh_shim'"
   log "Created zsh shortcut at $zsh_shim."
 
-  current_shell="${SHELL:-}"
-  if [[ "$current_shell" == "$zsh_bin" ]]; then
-    log "Login shell already points to local zsh."
+  current_shell="$(getent passwd "$USER" | cut -d: -f7 2>/dev/null || printf '%s' "${SHELL:-}")"
+  if [[ "$current_shell" == "$zsh_bin" || "$current_shell" == "$zsh_shim" ]]; then
+    log "Login shell already points to zsh."
   elif command -v chsh >/dev/null 2>&1; then
     chsh_cmd="chsh -s '$zsh_bin'"
 
@@ -240,9 +279,9 @@ configure_rootless_zsh_shell() {
   fi
 
   profile_block=$(printf '%s\n' \
-    "if [ -x \"$zsh_bin\" ] && [ -z \"\${ZSH_VERSION:-}\" ] && [ \"\${SHELL:-}\" != \"$zsh_bin\" ]; then" \
+    "if [ -x \"$zsh_shim\" ] && [ -z \"\${ZSH_VERSION:-}\" ] && [ \"\${SHELL:-}\" != \"$zsh_bin\" ]; then" \
     "  case \"\$-\" in" \
-    "    *i*) exec \"$zsh_bin\" -l ;;" \
+    "    *i*) exec \"$zsh_shim\" -l ;;" \
     "  esac" \
     "fi")
 
@@ -266,6 +305,7 @@ install_macos() {
 
 install_wsl() {
   install_apt_linux "WSL"
+  install_linuxbrew_cli_tools
 }
 
 install_apt_linux() {
@@ -288,9 +328,10 @@ install_apt_linux() {
 
 install_linux() {
   install_apt_linux "Linux"
+  install_linuxbrew_cli_tools
 }
 
-install_rootless_linux() {
+install_linuxbrew_cli_tools() {
   local formula_file="$INSTALL_DIR/tool-formulae.txt"
   local brew_bin
 
@@ -301,8 +342,23 @@ install_rootless_linux() {
 
   ensure_rootless_homebrew
   brew_bin="$(rootless_brew_bin)"
+  activate_brew_shellenv "$brew_bin"
   ensure_bun_tap "$brew_bin"
   install_brew_formulae "$brew_bin" "$formula_file"
+  activate_brew_shellenv "$brew_bin"
+}
+
+install_rootless_linux() {
+  local brew_bin
+
+  install_linuxbrew_cli_tools
+
+  if command -v zsh >/dev/null 2>&1; then
+    log "zsh is already available at $(command -v zsh). Skipping Linuxbrew zsh install."
+    return 0
+  fi
+
+  brew_bin="$(rootless_brew_bin)"
   log "Installing zsh last with verbose output. This can take a while on older Linux systems."
   run "'$brew_bin' install -v zsh"
 }
@@ -311,7 +367,9 @@ check_common_tools() {
   local tools_file="$INSTALL_DIR/common-tools.txt"
   local missing=()
 
-  if [[ "$ROOTLESS" -eq 1 ]]; then
+  if [[ "$TARGET" == "linux" || "$TARGET" == "wsl" ]]; then
+    tools_file="$INSTALL_DIR/common-tools-rootless.txt"
+  elif [[ "$ROOTLESS" -eq 1 ]]; then
     tools_file="$INSTALL_DIR/common-tools-rootless.txt"
   fi
 
@@ -415,10 +473,11 @@ esac
 
 check_common_tools
 
-if [[ "$ROOTLESS" -eq 1 && ( "$TARGET" == "linux" || "$TARGET" == "wsl" ) ]]; then
-  configure_rootless_zsh_shell
+if [[ "$TARGET" == "linux" || "$TARGET" == "wsl" ]]; then
+  configure_linuxbrew_shellenv
+  configure_zsh_shell
 fi
 
 log "Done."
 
-enter_rootless_zsh_now
+enter_configured_zsh_now

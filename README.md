@@ -14,6 +14,9 @@ This automatically detects your platform and checks for sudo access to pick the 
 ./dotfiles/setup
 ```
 
+On Linux/WSL, the setup installs base packages with `apt` when available and then
+adds the shared CLI toolchain with a user-local Linuxbrew under `~/.linuxbrew`.
+
 ## Zsh layout
 
 - `.zshrc` is now a thin loader.
