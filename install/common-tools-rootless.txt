@@ -1,4 +1,4 @@
-# Commands expected after a rootless bootstrap on Linux/WSL.
+# Commands expected after a Linux/WSL bootstrap.
 zsh
 git
 fzf
