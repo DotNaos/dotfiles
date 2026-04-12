@@ -17,6 +17,12 @@ This automatically detects your platform and checks for sudo access to pick the 
 On Linux/WSL, the setup installs base packages with `apt` when available and then
 adds the shared CLI toolchain with a user-local Linuxbrew under `~/.linuxbrew`.
 
+### System configuration
+
+The setup script applies lightweight, platform-aware system settings (default profile: `client`, override with `DOTFILES_SYSTEM_PROFILE`).
+
+- macOS: enables Touch ID for `sudo` by inserting `pam_tid.so` into `/etc/pam.d/sudo` (idempotent, respects `--dry-run`).
+
 ## Zsh layout
 
 - `.zshrc` is now a thin loader.
