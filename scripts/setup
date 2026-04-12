@@ -108,55 +108,20 @@ ensure_bun_tap() {
   run "'$brew_bin' tap oven-sh/bun"
 }
 
-configure_macos_sudo_touchid() {
-  local pam_file="/etc/pam.d/sudo"
-  local touchid_line="auth       sufficient     pam_tid.so"
-  local tmp_file
-
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "dry-run: ensure Touch ID is configured for sudo in $pam_file"
-    return 0
-  fi
-
-  if [[ ! -f "$pam_file" ]]; then
-    log "sudo pam config not found at $pam_file. Skipping Touch ID setup."
-    return 0
-  fi
-
-  if sudo grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_tid\\.so' "$pam_file"; then
-    log "Touch ID already enabled for sudo."
-    return 0
-  fi
-
-  tmp_file="$(mktemp)"
-  if ! sudo cp "$pam_file" "$tmp_file"; then
-    log "Failed to copy $pam_file. Cannot enable Touch ID."
-    rm -f "$tmp_file"
-    return 1
-  fi
-
-  if sudo sh -c "printf '%s\n' \"$touchid_line\" | cat - \"$tmp_file\" > \"$tmp_file.new\""; then
-    if sudo mv "$tmp_file.new" "$pam_file"; then
-      log "Enabled Touch ID for sudo in $pam_file."
-    else
-      log "Failed to install updated sudo pam config."
-      sudo rm -f "$tmp_file.new"
-      sudo rm -f "$tmp_file"
-      return 1
-    fi
-  else
-    log "Failed to prepare Touch ID sudo pam config."
-    sudo rm -f "$tmp_file" "$tmp_file.new"
-    return 1
-  fi
-
-  sudo rm -f "$tmp_file"
-}
-
 configure_system() {
+  local macos_system_script="$ROOT_DIR/scripts/system/macos"
+
   case "$TARGET" in
     macos)
-      configure_macos_sudo_touchid
+      if [[ -x "$macos_system_script" ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+          run "'$macos_system_script' --dry-run"
+        else
+          run "'$macos_system_script'"
+        fi
+      else
+        log "No macOS system config script found at $macos_system_script"
+      fi
       ;;
     linux|wsl)
       log "No system configuration steps for $TARGET ($SYSTEM_PROFILE) yet."
