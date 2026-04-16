@@ -1,5 +1,24 @@
 # PATH and environment variable setup.
 
+if [[ -z "${PATH:-}" ]]; then
+  export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+fi
+
+if [[ -f "/opt/homebrew/bin/brew" ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+elif [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
+  eval "$($HOME/.linuxbrew/bin/brew shellenv)"
+fi
+
+append_path_once "/usr/bin"
+append_path_once "/bin"
+append_path_once "/usr/sbin"
+append_path_once "/sbin"
+
 export DOTNET_ROOT="$HOME/.dotnet"
 export BUN_INSTALL="$HOME/.bun"
 
@@ -25,3 +44,14 @@ case "$DOTFILES_PLATFORM" in
     append_path_once "$PNPM_HOME"
     ;;
 esac
+
+for __nvm_node_bin in /home/linuxbrew/.linuxbrew/opt/nvm/versions/node/*/bin(N); do
+  append_path_once "$__nvm_node_bin"
+done
+unset __nvm_node_bin
+
+FNM_PATH="$HOME/.local/share/fnm"
+if [[ -d "$FNM_PATH" ]]; then
+  append_path_once "$FNM_PATH"
+  eval "$(fnm env)"
+fi

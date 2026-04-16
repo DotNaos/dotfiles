@@ -12,6 +12,7 @@ LINK_ITEMS=(
   ".tmux.conf"
   ".zsh"
   ".zsh_aliases"
+  ".zshenv"
   ".zshrc"
   ".zshrc.d"
   ".zshrc_functions"

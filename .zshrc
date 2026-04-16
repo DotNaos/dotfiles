@@ -1,7 +1,7 @@
-# Seed a minimal system PATH early so shell startup does not depend on
-# inherited environment state before Homebrew and modules run.
-if [[ -z "${PATH:-}" ]]; then
-  export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+# Reuse the universal zsh bootstrap when `.zshrc` is sourced manually in an
+# already-running shell.
+if [[ -f "$HOME/.zshenv" ]]; then
+  source "$HOME/.zshenv"
 fi
 
 # Non-interactive shells should not load prompt tooling or other interactive
@@ -10,25 +10,6 @@ fi
 if [[ ! -o interactive ]]; then
   return 0
 fi
-
-# Initialize Homebrew/Linuxbrew environment
-if [[ -f "/opt/homebrew/bin/brew" ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -f "/usr/local/bin/brew" ]]; then
-  eval "$(/usr/local/bin/brew shellenv)"
-elif [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
-  eval "$($HOME/.linuxbrew/bin/brew shellenv)"
-fi
-
-for system_dir in /usr/bin /bin /usr/sbin /sbin; do
-  case ":${PATH:-}:" in
-    *":$system_dir:"*) ;;
-    *) PATH="${PATH:+$PATH:}$system_dir" ;;
-  esac
-done
-export PATH
 
 # Ensure Zinit exists
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -57,11 +38,4 @@ if [[ -d "$ZSHRC_D" ]]; then
     source "$__dotfiles_module"
   done
   unset __dotfiles_module
-fi
-
-# fnm
-FNM_PATH="/home/oli/.local/share/fnm"
-if [ -d "$FNM_PATH" ]; then
-  export PATH="$FNM_PATH:$PATH"
-  eval "`fnm env`"
 fi
