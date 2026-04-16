@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+log() {
+  printf '[system-macos] %s\n' "$*"
+}
+
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
+
+is_macos() {
+  [[ "$(dotfiles_detect_platform)" == "macos" ]]
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'USAGE'
+Usage: scripts/system/macos [--dry-run]
+
+Runs the macOS hook set through the shared system apply entrypoint.
+
+Options:
+  --dry-run   Print actions without applying changes
+  -h, --help  Show this help
+USAGE
+  exit 0
+fi
+
+if ! is_macos; then
+  log "Not running on macOS; skipping system tweaks."
+  exit 0
+fi
+
+DOTFILES_PLATFORM=macos exec "$ROOT_DIR/scripts/system/apply" "$@"

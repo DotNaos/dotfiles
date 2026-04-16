@@ -5,31 +5,15 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_SCRIPT="$ROOT_DIR/scripts/setup"
 LINK_SCRIPT="$ROOT_DIR/scripts/link-home"
 
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
+
 DRY_RUN=0
 EXPLICIT_MODE=0
 ARGS=()
 
 log() {
   printf '[setup-entry] %s\n' "$*"
-}
-
-detect_platform() {
-  if [[ "${OSTYPE:-}" == darwin* ]]; then
-    echo "macos"
-    return
-  fi
-
-  if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
-    echo "wsl"
-    return
-  fi
-
-  if [[ -r /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-    echo "wsl"
-    return
-  fi
-
-  echo "linux"
 }
 
 has_sudo_access() {
@@ -56,8 +40,10 @@ for arg in "$@"; do
   ARGS+=("$arg")
 done
 
+dotfiles_load_context
+
 if [[ "$EXPLICIT_MODE" -eq 0 ]]; then
-  case "$(detect_platform)" in
+  case "$DOTFILES_PLATFORM" in
     wsl)
       if has_apt_get && has_sudo_access; then
         ARGS+=("--only" "wsl")
