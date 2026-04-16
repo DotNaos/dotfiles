@@ -1,0 +1,58 @@
+{
+  "project_panel": {
+    "dock": "left"
+  },
+  "icon_theme": "Colored Zed Icons Theme Dark",
+  "theme": {
+    "mode": "system",
+    "light": "One Light",
+    "dark": "Zedokai Darker (Filter Spectrum)"
+  },
+
+  "terminal": {
+    "shell": "system",
+    "font_family": "FiraCode Nerd Font Mono",
+    "font_weight": 600,
+    "detect_venv": {
+      "on": {
+        "directories": [".env", "env", ".venv", "venv"],
+        "activate_script": "default"
+      }
+    }
+  },
+
+  "ui_font_size": 16,
+  "ui_font_family": "FiraCode Nerd Font",
+  "ui_font_weight": 600,
+  "buffer_font_weight": 600,
+  "buffer_font_size": 16,
+  "agent": {
+    "default_model": {
+      "provider": "copilot_chat",
+      "model": "o4-mini"
+    }
+  },
+  "features": {
+    "edit_prediction_provider": "copilot"
+  },
+  "languages": {
+    "Python": {
+      "language_servers": ["pylsp", "!pyright"],
+      "preferred_line_length": 120
+    }
+  },
+  "lsp": {
+    "pylsp": {
+      "settings": {
+        "plugins": {
+          "ruff": {
+            "enabled": true,
+            "formatEnabled": true,
+            "lineLength": 120,
+            "targetVersion": "py311"
+          }
+        }
+      }
+    }
+  }
+}

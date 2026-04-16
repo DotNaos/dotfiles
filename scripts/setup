@@ -7,7 +7,9 @@ INSTALL_DIR="$ROOT_DIR/install"
 ONLY=""
 DRY_RUN=0
 ROOTLESS=0
-SYSTEM_PROFILE="${DOTFILES_SYSTEM_PROFILE:-client}"
+
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
 
 usage() {
   cat <<USAGE
@@ -31,25 +33,6 @@ run() {
   else
     eval "$*"
   fi
-}
-
-detect_platform() {
-  if [[ "${OSTYPE:-}" == darwin* ]]; then
-    echo "macos"
-    return
-  fi
-
-  if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
-    echo "wsl"
-    return
-  fi
-
-  if [[ -r /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-    echo "wsl"
-    return
-  fi
-
-  echo "linux"
 }
 
 has_sudo_access() {
@@ -109,24 +92,17 @@ ensure_bun_tap() {
 }
 
 configure_system() {
-  local macos_system_script="$ROOT_DIR/scripts/system/macos"
+  local system_apply_script="$ROOT_DIR/scripts/system/apply"
+  local system_cmd
 
-  case "$TARGET" in
-    macos)
-      if [[ -x "$macos_system_script" ]]; then
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-          run "'$macos_system_script' --dry-run"
-        else
-          run "'$macos_system_script'"
-        fi
-      else
-        log "No macOS system config script found at $macos_system_script"
-      fi
-      ;;
-    linux|wsl)
-      log "No system configuration steps for $TARGET ($SYSTEM_PROFILE) yet."
-      ;;
-  esac
+  if [[ ! -x "$system_apply_script" ]]; then
+    log "No system apply script found at $system_apply_script"
+    return 0
+  fi
+
+  system_cmd="'$system_apply_script' --platform '$TARGET'"
+  [[ "$DRY_RUN" -eq 1 ]] && system_cmd="$system_cmd --dry-run"
+  run "$system_cmd"
 }
 
 install_brew_formulae() {
@@ -444,7 +420,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-PLATFORM="$(detect_platform)"
+dotfiles_load_context
+
+PLATFORM="$DOTFILES_PLATFORM"
 TARGET="${ONLY:-$PLATFORM}"
 
 if [[ "$ROOTLESS" -eq 0 && ( "$TARGET" == "linux" || "$TARGET" == "wsl" ) ]]; then
@@ -468,7 +446,7 @@ log "Target platform: $TARGET"
 if [[ "$ROOTLESS" -eq 1 ]]; then
   log "Install profile: rootless"
 fi
-log "System profile: $SYSTEM_PROFILE"
+log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
 
 case "$TARGET" in
   macos)

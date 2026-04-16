@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_HOME="${HOME}"
+DRY_RUN=0
+RENDER_ROOT=""
+
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage: ./scripts/render-configs [--dry-run] [--home PATH] [--render-root PATH]
+
+Options:
+  --dry-run            Print actions without writing rendered output
+  --home PATH          Render for a different home directory
+  --render-root PATH   Override the render output directory
+  -h, --help           Show this help
+USAGE
+}
+
+log() {
+  printf '[render-configs] %s\n' "$*"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --home)
+      TARGET_HOME="${2:-}"
+      shift 2
+      ;;
+    --render-root)
+      RENDER_ROOT="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      log "Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$TARGET_HOME" ]]; then
+  log "Target home must not be empty."
+  exit 1
+fi
+
+if [[ -z "$RENDER_ROOT" ]]; then
+  RENDER_ROOT="$TARGET_HOME/.local/state/dotfiles/rendered"
+fi
+
+export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
+dotfiles_load_context
+
+log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
+log "Context file: $DOTFILES_CONTEXT_CONFIG"
+log "Render root: $RENDER_ROOT"
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  log "dry-run: render managed configs from base/platform/role/mode/shell overlays"
+fi
+
+export DOTFILES_RENDER_ROOT="$RENDER_ROOT"
+export DOTFILES_REPO_ROOT="$ROOT_DIR"
+export DOTFILES_RENDER_DRY_RUN="$DRY_RUN"
+
+python3 - <<'PY'
+import json
+import os
+import shutil
+from pathlib import Path
+
+repo_root = Path(os.environ["DOTFILES_REPO_ROOT"])
+render_root = Path(os.environ["DOTFILES_RENDER_ROOT"])
+dry_run = os.environ["DOTFILES_RENDER_DRY_RUN"] == "1"
+
+context = {
+    "platform": os.environ["DOTFILES_PLATFORM"],
+    "role": os.environ["DOTFILES_ROLE"],
+    "mode": os.environ["DOTFILES_MODE"],
+    "shell": os.environ["DOTFILES_SHELL"],
+}
+
+layers = [
+    repo_root / "context" / "base",
+    repo_root / "context" / "platform" / context["platform"],
+    repo_root / "context" / "role" / context["role"],
+    repo_root / "context" / "mode" / context["mode"],
+    repo_root / "context" / "shell" / context["shell"],
+]
+
+managed_apps = ("git", "ghostty", "nvim", "zed")
+concat_files = {
+    Path(".config/git/config"),
+    Path(".config/ghostty/config"),
+}
+json_merge_files = {
+    Path(".config/zed/settings.json"),
+}
+
+
+def log(message: str) -> None:
+    print(f"[render-configs] {message}")
+
+
+def ensure_parent(path: Path) -> None:
+    if not dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def copy_tree(source: Path, destination: Path) -> None:
+    for item in sorted(source.rglob("*")):
+        relative = item.relative_to(source)
+        target = destination / relative
+
+        if item.is_dir():
+            if not dry_run:
+                target.mkdir(parents=True, exist_ok=True)
+            continue
+
+        if item.is_symlink():
+            resolved = item.resolve()
+            if not dry_run:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists() or target.is_symlink():
+                    target.unlink()
+                target.symlink_to(resolved)
+            continue
+
+        if not dry_run:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, target)
+
+
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def deep_merge(base: dict, overlay: dict) -> dict:
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+if not dry_run:
+    shutil.rmtree(render_root, ignore_errors=True)
+    render_root.mkdir(parents=True, exist_ok=True)
+
+active_layers = [layer for layer in layers if layer.exists()]
+for layer in active_layers:
+    log(f"Using layer: {layer.relative_to(repo_root)}")
+
+concat_buffer = {}
+json_buffer = {}
+
+for layer in active_layers:
+    for app in managed_apps:
+        source_dir = layer / ".config" / app
+        if not source_dir.exists():
+            continue
+
+        destination_dir = render_root / ".config" / app
+        if app == "nvim" or app == "ghostty" or app == "git" or app == "zed":
+            copy_tree(source_dir, destination_dir)
+
+        for file_path in sorted(source_dir.rglob("*")):
+            if not file_path.is_file():
+                continue
+            relative = Path(".config") / app / file_path.relative_to(source_dir)
+            if relative in concat_files:
+                concat_buffer.setdefault(relative, []).append(file_path.read_text())
+            elif relative in json_merge_files:
+                current = json_buffer.get(relative, {})
+                json_buffer[relative] = deep_merge(current, load_json(file_path))
+
+context_dir = render_root / ".config" / "nvim" / "lua" / "config"
+context_file = context_dir / "dotfiles_context.lua"
+context_lua = (
+    "return {\n"
+    f'  platform = "{context["platform"]}",\n'
+    f'  role = "{context["role"]}",\n'
+    f'  mode = "{context["mode"]}",\n'
+    f'  shell = "{context["shell"]}",\n'
+    "}\n"
+)
+if dry_run:
+    log(f"Would write generated context: {context_file}")
+else:
+    context_dir.mkdir(parents=True, exist_ok=True)
+    context_file.write_text(context_lua)
+
+for relative, parts in concat_buffer.items():
+    destination = render_root / relative
+    content = "\n".join(part.rstrip("\n") for part in parts if part.strip()) + "\n"
+    if dry_run:
+        log(f"Would concatenate {len(parts)} layer(s) into {destination}")
+    else:
+        ensure_parent(destination)
+        destination.write_text(content)
+
+for relative, payload in json_buffer.items():
+    destination = render_root / relative
+    if dry_run:
+        log(f"Would merge JSON layers into {destination}")
+    else:
+        ensure_parent(destination)
+        destination.write_text(json.dumps(payload, indent=2) + "\n")
+PY

@@ -6,6 +6,10 @@ TARGET_HOME="${HOME}"
 DRY_RUN=0
 BACKUP_ROOT=""
 BACKUP_ROOT_ANNOUNCED=0
+RENDER_ROOT=""
+
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
 
 LINK_ITEMS=(
   ".jj"
@@ -19,13 +23,21 @@ LINK_ITEMS=(
   ".zshrc_user"
 )
 
+MANAGED_CONFIG_ITEMS=(
+  "git"
+  "ghostty"
+  "nvim"
+  "zed"
+)
+
 usage() {
   cat <<USAGE
-Usage: ./scripts/link-home [--dry-run] [--home PATH]
+Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH]
 
 Options:
   --dry-run     Print actions without executing
   --home PATH   Link into a different home directory
+  --render-root PATH   Override the rendered config output directory
   -h, --help    Show this help
 USAGE
 }
@@ -45,6 +57,15 @@ run() {
 ensure_parent_dir() {
   local target_path="$1"
   run "mkdir -p '$(dirname "$target_path")'"
+}
+
+rendered_config_root() {
+  if [[ -n "$RENDER_ROOT" ]]; then
+    printf '%s\n' "$RENDER_ROOT"
+    return 0
+  fi
+
+  printf '%s/.local/state/dotfiles/rendered\n' "$TARGET_HOME"
 }
 
 init_backup_root() {
@@ -76,7 +97,55 @@ backup_conflicting_path() {
   log "Backed up ${target_path#"$TARGET_HOME"/}"
 }
 
-link_config_tree() {
+is_managed_config_item() {
+  local item="$1"
+  local managed
+
+  for managed in "${MANAGED_CONFIG_ITEMS[@]}"; do
+    [[ "$managed" == "$item" ]] && return 0
+  done
+
+  return 1
+}
+
+link_source_path() {
+  local source_path="$1"
+  local target_path="$2"
+  local label="$3"
+
+  ensure_parent_dir "$target_path"
+
+  if [[ -L "$target_path" ]]; then
+    local current_target
+    current_target="$(readlink "$target_path")"
+    if [[ "$current_target" == "$source_path" ]]; then
+      log "Already linked: $label"
+      return 0
+    fi
+  fi
+
+  if [[ -e "$target_path" || -L "$target_path" ]]; then
+    backup_conflicting_path "$target_path"
+  fi
+
+  run "ln -sfn '$source_path' '$target_path'"
+  log "Linked $label"
+}
+
+render_managed_configs() {
+  local render_script="$ROOT_DIR/scripts/render-configs"
+  local render_args=("--home" "$TARGET_HOME" "--render-root" "$(rendered_config_root)")
+
+  [[ -x "$render_script" ]] || return 0
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    render_args=("--dry-run" "${render_args[@]}")
+  fi
+
+  "$render_script" "${render_args[@]}"
+}
+
+link_raw_config_tree() {
   local source_root="$ROOT_DIR/.config"
   local target_root="$TARGET_HOME/.config"
   local source_path relative_path target_path
@@ -87,25 +156,33 @@ link_config_tree() {
 
   while IFS= read -r source_path; do
     relative_path="${source_path#"$source_root"/}"
+    if is_managed_config_item "$relative_path"; then
+      log "Skipping raw .config/$relative_path because it is context-rendered."
+      continue
+    fi
     target_path="$target_root/$relative_path"
-
-    if [[ -L "$target_path" ]]; then
-      local current_target
-      current_target="$(readlink "$target_path")"
-      if [[ "$current_target" == "$source_path" ]]; then
-        log "Already linked: .config/$relative_path"
-        continue
-      fi
-    fi
-
-    if [[ -e "$target_path" || -L "$target_path" ]]; then
-      backup_conflicting_path "$target_path"
-    fi
-
-    ensure_parent_dir "$target_path"
-    run "ln -sfn '$source_path' '$target_path'"
-    log "Linked .config/$relative_path"
+    link_source_path "$source_path" "$target_path" ".config/$relative_path"
   done < <(find "$source_root" -mindepth 1 -maxdepth 1 | sort)
+}
+
+link_rendered_config_tree() {
+  local item source_path target_path
+  local source_root
+
+  source_root="$(rendered_config_root)/.config"
+  run "mkdir -p '$TARGET_HOME/.config'"
+
+  for item in "${MANAGED_CONFIG_ITEMS[@]}"; do
+    source_path="$source_root/$item"
+    target_path="$TARGET_HOME/.config/$item"
+
+    if [[ "$DRY_RUN" -ne 1 && ! -e "$source_path" && ! -L "$source_path" ]]; then
+      log "Skipping missing rendered config: .config/$item"
+      continue
+    fi
+
+    link_source_path "$source_path" "$target_path" ".config/$item"
+  done
 }
 
 link_item() {
@@ -147,6 +224,10 @@ while [[ $# -gt 0 ]]; do
       TARGET_HOME="${2:-}"
       shift 2
       ;;
+    --render-root)
+      RENDER_ROOT="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -164,7 +245,13 @@ if [[ -z "$TARGET_HOME" ]]; then
   exit 1
 fi
 
-link_config_tree
+export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
+dotfiles_load_context
+
+log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
+render_managed_configs
+link_raw_config_tree
+link_rendered_config_tree
 
 for item in "${LINK_ITEMS[@]}"; do
   link_item "$item"
