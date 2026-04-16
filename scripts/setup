@@ -7,6 +7,7 @@ INSTALL_DIR="$ROOT_DIR/install"
 ONLY=""
 DRY_RUN=0
 ROOTLESS=0
+SYSTEM_PROFILE="${DOTFILES_SYSTEM_PROFILE:-client}"
 
 usage() {
   cat <<USAGE
@@ -105,6 +106,27 @@ ensure_rootless_homebrew() {
 ensure_bun_tap() {
   local brew_bin="${1:-brew}"
   run "'$brew_bin' tap oven-sh/bun"
+}
+
+configure_system() {
+  local macos_system_script="$ROOT_DIR/scripts/system/macos"
+
+  case "$TARGET" in
+    macos)
+      if [[ -x "$macos_system_script" ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+          run "'$macos_system_script' --dry-run"
+        else
+          run "'$macos_system_script'"
+        fi
+      else
+        log "No macOS system config script found at $macos_system_script"
+      fi
+      ;;
+    linux|wsl)
+      log "No system configuration steps for $TARGET ($SYSTEM_PROFILE) yet."
+      ;;
+  esac
 }
 
 install_brew_formulae() {
@@ -446,6 +468,7 @@ log "Target platform: $TARGET"
 if [[ "$ROOTLESS" -eq 1 ]]; then
   log "Install profile: rootless"
 fi
+log "System profile: $SYSTEM_PROFILE"
 
 case "$TARGET" in
   macos)
@@ -470,6 +493,8 @@ case "$TARGET" in
     fi
     ;;
 esac
+
+configure_system
 
 check_common_tools
 

@@ -17,6 +17,8 @@ This automatically detects your platform and checks for sudo access to pick the 
 On Linux/WSL, the setup installs base packages with `apt` when available and then
 adds the shared CLI toolchain with a user-local Linuxbrew under `~/.linuxbrew`.
 
+Platform-specific system notes (e.g., macOS Touch ID for `sudo`) live in `docs/system/`.
+
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
