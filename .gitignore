@@ -124,6 +124,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+!scripts/lib/
+!scripts/lib/context.sh
 parts/
 sdist/
 var/
