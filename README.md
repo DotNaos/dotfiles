@@ -43,6 +43,35 @@ Managed app configs are rendered from `context/base/` plus optional overlays in:
 - `context/mode/<mode>/`
 - `context/shell/<shell>/`
 
+## Codex
+
+Global Codex guidance and configuration use the same context renderer and home
+linker as the other managed applications:
+
+- `context/base/codex/AGENTS.md` contains portable global guidance.
+- `context/base/codex/config.toml` contains shared Codex defaults.
+- `context/platform/<platform>/codex/config.toml` contains platform-specific
+  additions such as desktop preferences and local launcher paths.
+
+Codex config layers use additive dotted keys. A platform layer may add settings
+but must not redefine a key from an earlier layer; conflicting keys stop the
+render instead of producing an ambiguous config. Global `AGENTS.md` guidance is
+managed only from the base layer.
+
+The renderer writes only `AGENTS.md` and `config.toml` into
+`~/.local/state/dotfiles/rendered/.codex/`. The linker then links those two files
+individually into `~/.codex/` and backs up conflicting targets. It never links or
+copies the complete live Codex directory. Authentication, sessions, memories,
+databases, logs, caches, app state, and installed or bundled plugins and skills
+remain local and unversioned.
+
+To inspect or apply only the Codex files:
+
+```bash
+./scripts/link-home --only codex --dry-run
+./scripts/link-home --only codex
+```
+
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
@@ -55,39 +84,31 @@ Managed app configs are rendered from `context/base/` plus optional overlays in:
 
 ## Secrets and env
 
-- Secret helpers live in `.zshrc.d/10-shell/50-secrets.zsh`.
-- Shared secret references belong in `.zshrc.d/10-shell/60-shared-secrets.zsh`.
-- Shell startup does not resolve 1Password secrets or require `op`.
-- If `~/.env` exists, it is sourced quietly as the user's own home-level overrides.
-- Project-specific secrets stay in each project, for example `.env.1password` as a template and `.env.local` as an injected destination.
+- Vault references and secret values never live in this repository.
+- Normal shell startup does not load a service-account token, secret file, or
+  1Password SSH agent.
+- Codex shells load the read-only token from the unversioned
+  `~/.config/1password/op/service-account.env` file.
+- Set `CODEX_DONT_USE_1PASSWORD_SERVICE_ACCOUNT=1` or
+  `OP_SERVICE_ACCOUNT_DISABLED=1` when an interactive desktop approval is
+  required instead.
+- The unversioned `~/.config/1password/op/.env` file contains the user's Vault
+  references. It is loaded only when `loadsecrets` is run explicitly.
 
-Shared secret reference module:
-
-```bash
-export OPENAI_API_KEY="op://Private/OpenAI/api key"
-export ANTHROPIC_API_KEY="op://Private/Anthropic/api key"
-```
-
-Available helpers:
+Available commands:
 
 ```bash
-op-ready
-op-read-ref op://Private/example/password
-secrets-shared-load
-secrets-shared-run -- env | grep API_KEY
+loadsecrets
+listsecrets
 env-load .env .env.local
-env-run .env.1password -- pnpm dev
-env-inject .env.1password .env.local
 ```
 
 Notes:
 
-- `.zshrc.d/10-shell/60-shared-secrets.zsh` is autoloaded and should only export literal `op://...` references.
-- `~/.env` is for user-owned home-level env vars and is sourced automatically when present.
-- `secrets-shared-load` resolves all currently exported `op://...` variables, or only the names you pass explicitly.
-- `secrets-shared-run` and `env-run` use `op run`, so secrets only exist for the spawned process.
-- `env-inject` uses `op inject` and writes `.env.local` with mode `0600` by default.
-- If `op` is missing or not signed in, shell startup stays quiet; manual helpers print a short error.
+- `loadsecrets` sources the local reference file into the current shell. It does
+  not resolve the references into secret values.
+- `listsecrets` prints only the configured environment-variable names.
+- `env-load` remains a generic, explicit project env-file loader.
 
 ## Smoke checks
 

@@ -7,6 +7,7 @@ DRY_RUN=0
 BACKUP_ROOT=""
 BACKUP_ROOT_ANNOUNCED=0
 RENDER_ROOT=""
+ONLY=""
 
 # shellcheck source=scripts/lib/context.sh
 source "$ROOT_DIR/scripts/lib/context.sh"
@@ -32,12 +33,13 @@ MANAGED_CONFIG_ITEMS=(
 
 usage() {
   cat <<USAGE
-Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH]
+Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH] [--only codex]
 
 Options:
   --dry-run     Print actions without executing
   --home PATH   Link into a different home directory
   --render-root PATH   Override the rendered config output directory
+  --only codex  Render and link only the managed Codex files
   -h, --help    Show this help
 USAGE
 }
@@ -142,6 +144,10 @@ render_managed_configs() {
     render_args=("--dry-run" "${render_args[@]}")
   fi
 
+  if [[ "$ONLY" == "codex" ]]; then
+    render_args+=("--only" "codex")
+  fi
+
   "$render_script" "${render_args[@]}"
 }
 
@@ -182,6 +188,27 @@ link_rendered_config_tree() {
     fi
 
     link_source_path "$source_path" "$target_path" ".config/$item"
+  done
+}
+
+link_rendered_codex_files() {
+  local item source_path target_path
+  local source_root target_root
+
+  source_root="$(rendered_config_root)/.codex"
+  target_root="$TARGET_HOME/.codex"
+  run "mkdir -p '$target_root'"
+
+  for item in "AGENTS.md" "config.toml"; do
+    source_path="$source_root/$item"
+    target_path="$target_root/$item"
+
+    if [[ "$DRY_RUN" -ne 1 && ! -e "$source_path" && ! -L "$source_path" ]]; then
+      log "Skipping missing rendered Codex file: .codex/$item"
+      continue
+    fi
+
+    link_source_path "$source_path" "$target_path" ".codex/$item"
   done
 }
 
@@ -228,6 +255,10 @@ while [[ $# -gt 0 ]]; do
       RENDER_ROOT="${2:-}"
       shift 2
       ;;
+    --only)
+      ONLY="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -245,13 +276,27 @@ if [[ -z "$TARGET_HOME" ]]; then
   exit 1
 fi
 
+if [[ -n "$ONLY" && "$ONLY" != "codex" ]]; then
+  log "Invalid --only value: $ONLY"
+  usage
+  exit 1
+fi
+
 export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
 dotfiles_load_context
 
 log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
 render_managed_configs
+
+if [[ "$ONLY" == "codex" ]]; then
+  link_rendered_codex_files
+  log "Done."
+  exit 0
+fi
+
 link_raw_config_tree
 link_rendered_config_tree
+link_rendered_codex_files
 
 for item in "${LINK_ITEMS[@]}"; do
   link_item "$item"
