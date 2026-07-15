@@ -356,3 +356,11 @@ zsdoc/data
 !/tests/_output/.gitkeep
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,linux,windows,lua,python,web,powershell,zsh
+
+# Never version a copied live Codex home, regardless of where it lands.
+**/.codex/
+
+# Codex context layers are default-deny. Review and allow each managed file explicitly.
+context/**/codex/*
+!context/**/codex/AGENTS.md
+!context/**/codex/config.toml

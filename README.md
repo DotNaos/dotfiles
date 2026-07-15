@@ -43,6 +43,35 @@ Managed app configs are rendered from `context/base/` plus optional overlays in:
 - `context/mode/<mode>/`
 - `context/shell/<shell>/`
 
+## Codex
+
+Global Codex guidance and configuration use the same context renderer and home
+linker as the other managed applications:
+
+- `context/base/codex/AGENTS.md` contains portable global guidance.
+- `context/base/codex/config.toml` contains shared Codex defaults.
+- `context/platform/<platform>/codex/config.toml` contains platform-specific
+  additions such as desktop preferences and local launcher paths.
+
+Codex config layers use additive dotted keys. A platform layer may add settings
+but must not redefine a key from an earlier layer; conflicting keys stop the
+render instead of producing an ambiguous config. Global `AGENTS.md` guidance is
+managed only from the base layer.
+
+The renderer writes only `AGENTS.md` and `config.toml` into
+`~/.local/state/dotfiles/rendered/.codex/`. The linker then links those two files
+individually into `~/.codex/` and backs up conflicting targets. It never links or
+copies the complete live Codex directory. Authentication, sessions, memories,
+databases, logs, caches, app state, and installed or bundled plugins and skills
+remain local and unversioned.
+
+To inspect or apply only the Codex files:
+
+```bash
+./scripts/link-home --only codex --dry-run
+./scripts/link-home --only codex
+```
+
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.

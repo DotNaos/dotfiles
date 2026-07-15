@@ -1,0 +1,67 @@
+# macOS Codex app preferences and machine-specific MCP launchers.
+notify = ["/Users/oli/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
+
+desktop.ambient-suggestions-enabled = false
+desktop.appearanceTheme = "dark"
+desktop.appearanceLightCodeThemeId = "one"
+desktop.appearanceDarkCodeThemeId = "codex"
+desktop.sansFontSize = 15
+desktop.codeFontSize = 14
+desktop.usePointerCursors = true
+desktop.followUpQueueMode = "steer"
+desktop.preventSleepWhileRunning = true
+desktop.keepRemoteControlAwakeWhilePluggedIn = true
+desktop.git-branch-prefix = ""
+desktop.git-pull-request-merge-method = "squash"
+desktop.git-show-sidebar-pr-icons = true
+desktop.git-commit-instructions = "Keep it short and concise. Only the key changes, don't summarize each micro change."
+desktop.conversationDetailMode = "STEPS_COMMANDS"
+desktop.hotkey-window-projectless-default-enabled = true
+desktop.show-context-window-usage = true
+desktop.dock-icon-preference = "app-default"
+desktop.selected-avatar-id = "null-signal"
+desktop.avatar-overlay-mascot-width-px = 100
+desktop.git-worktree-root = "/Users/oli/projects/.codex-worktrees"
+desktop.computerUseAlwaysHidePictureInPicture = true
+
+desktop.appearanceLightChromeTheme.accent = "#526fff"
+desktop.appearanceLightChromeTheme.contrast = 45
+desktop.appearanceLightChromeTheme.ink = "#383a42"
+desktop.appearanceLightChromeTheme.opaqueWindows = false
+desktop.appearanceLightChromeTheme.surface = "#fafafa"
+desktop.appearanceLightChromeTheme.semanticColors.diffAdded = "#3bba54"
+desktop.appearanceLightChromeTheme.semanticColors.diffRemoved = "#e45649"
+desktop.appearanceLightChromeTheme.semanticColors.skill = "#526fff"
+
+desktop.appearanceDarkChromeTheme.accent = "#0169cc"
+desktop.appearanceDarkChromeTheme.contrast = 50
+desktop.appearanceDarkChromeTheme.ink = "#fcfcfc"
+desktop.appearanceDarkChromeTheme.opaqueWindows = true
+desktop.appearanceDarkChromeTheme.surface = "#111111"
+desktop.appearanceDarkChromeTheme.fonts.code = "\"Geist Mono\", ui-monospace, \"SFMono-Regular\""
+desktop.appearanceDarkChromeTheme.fonts.ui = "Geist, Inter"
+desktop.appearanceDarkChromeTheme.semanticColors.diffAdded = "#00a240"
+desktop.appearanceDarkChromeTheme.semanticColors.diffRemoved = "#e02e2a"
+desktop.appearanceDarkChromeTheme.semanticColors.skill = "#b06dff"
+
+desktop."open-in-target-preferences".global = "ghostty"
+desktop."open-in-target-preferences".perPath."/Users/oli/.codex/worktrees/a6d1/aryazos" = "vscodeInsiders"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects" = "xcode"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects.school/tools/moodle/moodle-clients" = "cursor"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects.school/tools/study/study-replay-hydrogen" = "fileManager"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/active/agent-toolkit" = "antigravity"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/active/aryazos" = "vscodeInsiders"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/active/healinghuman" = "vscodeInsiders"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/agent-harness" = "antigravity"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/moodle/moodle-cli" = "vscodeInsiders"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/project-space" = "vscodeInsiders"
+desktop."open-in-target-preferences".perPath."/Users/oli/projects/ui" = "ghostty"
+
+mcp_servers.agentation.command = "npx"
+mcp_servers.agentation.args = ["-y", "agentation-mcp", "server", "--mcp-only", "--http-url", "http://localhost:4747"]
+mcp_servers."apple-services".command = "node"
+mcp_servers."apple-services".args = ["/Users/oli/projects/apple-services-mcp/dist/index.js"]
+mcp_servers.onshape.command = "sh"
+mcp_servers.onshape.args = ["-lc", 'export ONSHAPE_MCP_AUTH__ACCESS_KEY="$(op read "op://Personal/Onshape/Onshape API/access key")"; export ONSHAPE_MCP_AUTH__SECRET_KEY="$(op read "op://Personal/Onshape/Onshape API/secret key")"; export ONSHAPE_MCP_AUTH__METHOD=basic; exec /Users/oli/.cargo/bin/onshape-mcp']
+mcp_servers.sona.command = "/Users/oli/go/bin/sona"
+mcp_servers.sona.args = ["mcp"]

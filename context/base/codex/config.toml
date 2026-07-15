@@ -1,0 +1,28 @@
+# Shared Codex defaults. Keep platform-specific paths and app settings in overlays.
+approval_policy = "never"
+approvals_reviewer = "user"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+personality = "pragmatic"
+sandbox_mode = "danger-full-access"
+service_tier = "priority"
+skip_git_repo_check = true
+web_search = "cached"
+
+features.multi_agent = true
+features.hooks = true
+features.memories = true
+features.goals = true
+features.terminal_resize_reflow = true
+features.prevent_idle_sleep = true
+features.chronicle = false
+features.js_repl = false
+
+commands.approve = ["git", "npm", "pnpm", "bun", "python"]
+tui.session_picker_view = "comfortable"
+
+mcp_servers.context7.command = "npx"
+mcp_servers.context7.args = ["-y", "@upstash/context7-mcp@latest"]
+mcp_servers.figma.url = "https://mcp.figma.com/mcp"
+mcp_servers.openaiDeveloperDocs.url = "https://developers.openai.com/mcp"
+mcp_servers.sentry.url = "https://mcp.sentry.dev/mcp"
