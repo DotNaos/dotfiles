@@ -13,37 +13,53 @@ This is the primary operating protocol for every Codex task. Execute it as early
 ### First action: claim a name and rename the task
 
 - As the first executable workflow of every task, invoke `claim-agent-name` and complete it before planning, repository inspection, implementation, or any other substantive action.
-- Never invent, guess, or manually choose an agent name. Use the name returned by the skill, including when Project Space uses its offline fallback.
+- Never invent, guess, or manually choose an agent name. Use the clean display name produced by the skill.
+- Never show the Project CLI's machine-generated fallback code in a task title, and never add a numeric collision suffix.
+- Preserve the current thread's clean name. For a new name, atomically reserve the online Project Space claim when available; otherwise use the skill's locked local reservation store and deterministic full-pool search to skip every visible or previously reserved name.
+- If no clean name remains, leave the task title unchanged, briefly report the exhausted pool, and continue the user's actual task. Name allocation must never block otherwise authorized work.
 - If the skill reports the fallback warning, surface it verbatim and continue with the returned name.
 - Keep the same agent name for the entire task. When the issue number, objective, or project changes, update only the other title segments.
 - When no GitHub issue is assigned yet, use:
 
-  `AgentName · Short specific objective · ProjectName`
+  `AgentName · Short specific objective`
 
 - Example:
 
-  `Nora · Diagnose worktree startup · project-space`
+  `Nora · Diagnose worktree startup`
 
 ### Add the GitHub issue immediately
 
 - Substantive repository work should normally be associated with a GitHub issue before implementation begins.
 - If the actual issue number is already known when the task starts, include it in the first title immediately.
 - If the issue is found or created after the task starts, rename the task again as soon as the actual issue number is known. Do not wait until the next milestone or the end of the task.
-- Use:
+- With one visible task for the issue, use:
 
-  `#<issue-number> · AgentName · Short specific objective · ProjectName`
+  `#<issue-number> · AgentName · Short specific purpose`
 
 - Example (`#145` is only an example issue number):
 
-  `#145 · Nora · Persist machine state · project-space`
+  `#145 · Nora · Persist machine state`
+
+- When a second task for the same issue appears, number both tasks compactly:
+
+  `#<issue-number>/<task-number> · AgentName · Short specific purpose`
+
+- Example:
+
+  `#300/1 · Loril · Build Doctor`
+  `#300/2 · Naran · Verify os-pc`
 
 ### Title rules
 
-- The actual GitHub issue number comes first, followed by the agent name, objective, and optional project name.
-- Put the short project or repository name last so truncation hides the least important context first.
-- The project name is optional when it adds no useful context.
-- Keep the objective short and specific. Avoid vague titles such as `Continue`, `Fix issue`, `Investigation`, or titles that merely repeat the full user prompt.
+- Put the actual GitHub issue number first. When numbered, append the task number directly as `/1`, `/2`, and so on.
+- Do not add `/1` while an issue has only one task. When a second task appears, rename the original to `/1`, use `/2` for the new task, and continue with the next unused positive number.
+- Once an issue has multiple tasks, keep their numbers stable and never reuse them, even after a task finishes.
+- Put the agent name immediately after the issue so it stays visible before sidebar truncation.
+- Keep the purpose short and make it unique among concurrent tasks for the same issue, such as `Build Doctor` and `Verify os-pc`.
+- Omit phase and project as separate title segments. Add the project name at the very end only when the title would otherwise be ambiguous across projects.
+- Keep the purpose short and specific. Avoid vague titles such as `Continue`, `Fix issue`, `Investigation`, or titles that merely repeat the full user prompt.
 - If the main objective or primary issue changes, update the title immediately while keeping the same agent name.
+- For handoffs and existing ambiguous tasks, keep the issue number, task number, and claimed agent name stable, but rewrite the purpose so every still-visible task remains distinguishable.
 - One Codex task should have one primary GitHub issue. Split independent issues into separate Codex tasks.
 - Questions, brief research, administrative actions, and genuinely trivial changes do not require artificial GitHub issues.
 
@@ -63,6 +79,18 @@ This is the primary operating protocol for every Codex task. Execute it as early
 - If a changed file might belong in the commit but you cannot tell, inspect the diff first. If it is still ambiguous or risky, ask before staging it.
 - Never revert or overwrite changes you did not make unless the user explicitly asks for that.
 - When reporting back after a commit or PR, mention whether you included other existing changes or intentionally left any out.
+
+## Pull Request Approval Is The Sole Delivery Gate
+
+- For repository changes that are ready for review, agents have standing authorization to commit and push the task branch, create or update the pull request, and create, update, retry, or repair its non-production deployment. Do not ask for separate approval for these steps.
+- Whenever the repository supports Project Space prototypes, publish the pull-request review surface through the Project Space prototype feature. If the changed work has no prototype-compatible surface, state that clearly instead of inventing one.
+- The user's approval of the current pull-request revision is the sole normal human delivery gate. Before that approval, do not merge or start the `main` deployment.
+- Approval of the current pull-request revision authorizes the agent to merge it and complete the normal `main` delivery for exactly those merged changes, including release preparation, signing, publishing, deployment, retries, recovery, and final verification. Do not ask for another approval after the pull request is approved.
+- If later commits invalidate or dismiss the pull-request approval, the new current revision must be approved before merge. This remains the same pull-request approval gate, not an additional deployment gate.
+- Required CI, review, signing, security, compatibility, rollback, and health checks remain fail-closed technical gates. Fix or report a failed gate; never treat this standing authorization as permission to bypass it.
+- An explicit instruction such as `local only`, `do not create a pull request`, `do not merge`, or `do not deploy` overrides this standing authorization.
+- Unrelated changes, destructive data migrations, changed secrets or permissions, widened network access, and bypasses of protected-environment rules are outside the normal delivery flow and are not authorized by pull-request approval alone.
+- After delivery, verify and report the exact deployed commit, running version, health checks, and reachable origin. A merged pull request or green workflow alone is not proof of deployment.
 
 ## Response Format
 
@@ -196,5 +224,6 @@ Adhere to the SOLID principles:
 
 ## Tools
 
+- When the user asks to open, show, or navigate to an existing Codex task, thread, or chat in the Codex app, use the direct thread-navigation or deep-link capability with that task's thread ID instead of merely telling the user where to find it.
 - If you need long running shell stuff, and persistence, use `tmux`.
 - All my machines are connected to tailscale, if turned on.
