@@ -52,8 +52,9 @@ This is the primary operating protocol for every Codex task. Execute it as early
 ### Title rules
 
 - Put the actual GitHub issue number first. When numbered, append the task number directly as `/1`, `/2`, and so on.
-- Do not add `/1` while an issue has only one task. When a second task appears, re-list the visible tasks for that issue immediately before renaming, rename the original to `/1`, and assign the new task the smallest unused positive number starting at `/2`.
-- If concurrent tasks claim the same number, the task with the earlier `createdAt` value keeps it; break an exact timestamp tie by the lexicographically smaller thread ID. Every other colliding task must re-list the issue tasks and move to the next unused positive number before continuing.
+- Do not add `/1` while an issue has only one task. When a second task appears, re-list both active and archived tasks for that issue immediately before renaming, rename the original to `/1`, and assign the new task the next positive number above the highest number ever recorded for that issue. Treat every number found in active or archived task history as permanently reserved.
+- If complete active and archived task history cannot be queried, do not invent or reuse a task number; leave the current title unchanged, report that allocation is unavailable, and continue the actual task.
+- If concurrent tasks claim the same number, the task with the earlier `createdAt` value keeps it; break an exact timestamp tie by the lexicographically smaller thread ID. Every other colliding task must re-list the complete issue-task history and move above the highest reserved number before continuing.
 - Once an issue has multiple tasks, keep their numbers stable and never reuse them, even after a task finishes.
 - Put the agent name immediately after the issue so it stays visible before sidebar truncation.
 - Keep the purpose short and make it unique among concurrent tasks for the same issue, such as `Build Doctor` and `Verify os-pc`.
