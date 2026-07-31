@@ -52,7 +52,8 @@ This is the primary operating protocol for every Codex task. Execute it as early
 ### Title rules
 
 - Put the actual GitHub issue number first. When numbered, append the task number directly as `/1`, `/2`, and so on.
-- Do not add `/1` while an issue has only one task. When a second task appears, rename the original to `/1`, use `/2` for the new task, and continue with the next unused positive number.
+- Do not add `/1` while an issue has only one task. When a second task appears, re-list the visible tasks for that issue immediately before renaming, rename the original to `/1`, and assign the new task the smallest unused positive number starting at `/2`.
+- If concurrent tasks claim the same number, the task with the earlier `createdAt` value keeps it; break an exact timestamp tie by the lexicographically smaller thread ID. Every other colliding task must re-list the issue tasks and move to the next unused positive number before continuing.
 - Once an issue has multiple tasks, keep their numbers stable and never reuse them, even after a task finishes.
 - Put the agent name immediately after the issue so it stays visible before sidebar truncation.
 - Keep the purpose short and make it unique among concurrent tasks for the same issue, such as `Build Doctor` and `Verify os-pc`.
@@ -86,7 +87,7 @@ This is the primary operating protocol for every Codex task. Execute it as early
 - Whenever the repository supports Project Space prototypes, publish the pull-request review surface through the Project Space prototype feature. If the changed work has no prototype-compatible surface, state that clearly instead of inventing one.
 - The user's approval of the current pull-request revision is the sole normal human delivery gate. Before that approval, do not merge or start the `main` deployment.
 - Approval of the current pull-request revision authorizes the agent to merge it and complete the normal `main` delivery for exactly those merged changes, including release preparation, signing, publishing, deployment, retries, recovery, and final verification. Do not ask for another approval after the pull request is approved.
-- If later commits invalidate or dismiss the pull-request approval, the new current revision must be approved before merge. This remains the same pull-request approval gate, not an additional deployment gate.
+- Every later commit changes the exact pull-request revision and consumes the prior approval, even if GitHub continues to display it. The new current revision must be approved before merge, release, or deployment. This remains the same pull-request approval gate, not an additional deployment gate.
 - Required CI, review, signing, security, compatibility, rollback, and health checks remain fail-closed technical gates. Fix or report a failed gate; never treat this standing authorization as permission to bypass it.
 - An explicit instruction such as `local only`, `do not create a pull request`, `do not merge`, or `do not deploy` overrides this standing authorization.
 - Unrelated changes, destructive data migrations, changed secrets or permissions, widened network access, and bypasses of protected-environment rules are outside the normal delivery flow and are not authorized by pull-request approval alone.
