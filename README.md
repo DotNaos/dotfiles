@@ -72,6 +72,11 @@ To inspect or apply only the Codex files:
 ./scripts/link-home --only codex
 ```
 
+Codex agents record small, non-blocking workflow friction in the current
+repository's `PAPERCUTS.md` through the managed `papercut` CLI. The CLI is linked
+into `~/.local/bin/papercut` by the normal setup or Codex-only linking flow and
+does not perform transcript analysis or call another model.
+
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.

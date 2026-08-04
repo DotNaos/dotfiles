@@ -13,6 +13,7 @@ ONLY=""
 source "$ROOT_DIR/scripts/lib/context.sh"
 
 LINK_ITEMS=(
+  ".local/bin/papercut"
   ".jj"
   ".tmux.conf"
   ".zsh"
@@ -290,6 +291,7 @@ render_managed_configs
 
 if [[ "$ONLY" == "codex" ]]; then
   link_rendered_codex_files
+  link_item ".local/bin/papercut"
   log "Done."
   exit 0
 fi
