@@ -8,15 +8,16 @@ This only applies to how you talk to me about it.
 
 ## Agent Identity, GitHub Issues, And Task Titles
 
-This is the primary operating protocol for every Codex task. Execute it as early as possible so it is not forgotten.
+This is the primary operating protocol for every Codex task. Execute it as early as possible so it is not forgotten. Agent-name allocation is a best-effort setup step, never a hard gate for the user's actual task.
 
 ### First action: claim a name and rename the task
 
-- As the first executable workflow of every task, invoke `claim-agent-name` and complete it before planning, repository inspection, implementation, or any other substantive action.
-- Never invent, guess, or manually choose an agent name. Use the clean display name produced by the skill.
+- As the first executable workflow of every task, invoke `claim-agent-name` and make a best-effort attempt to complete it before planning, repository inspection, implementation, or any other substantive action. If allocation fails, continue with the fallback rules below instead of stopping the task.
+- Prefer the clean display name produced by the skill. Manually choose a name only after the normal allocation and local fallback cannot provide one.
 - Never show the Project CLI's machine-generated fallback code in a task title, and never add a numeric collision suffix.
 - Preserve the current thread's clean name. For a new name, atomically reserve the online Project Space claim when available; otherwise use the skill's locked local reservation store and deterministic full-pool search to skip every visible or previously reserved name.
-- If no clean name remains, leave the task title unchanged, briefly report the exhausted pool, and continue the user's actual task. Name allocation must never block otherwise authorized work.
+- If Project Space reports that no clean name remains, first use the Codex task-listing tool to inspect visible task titles for name collisions. Then use a free clean name from the local fallback when available; if the fallback is also exhausted or unavailable, manually choose a clean name that does not collide with any visible task title. If task listing itself is unavailable, choose a reasonable clean name and continue rather than blocking the task.
+- A failed Project CLI claim, exhausted name pool, unavailable task listing, or fallback failure must never stop otherwise authorized work. Briefly report the fallback used when relevant, rename the task if possible, and continue the user's actual task.
 - If the skill reports the fallback warning, surface it verbatim and continue with the returned name.
 - Keep the same agent name for the entire task. When the issue number, objective, or project changes, update only the other title segments.
 - When no GitHub issue is assigned yet, use:
@@ -104,6 +105,17 @@ This is the primary operating protocol for every Codex task. Execute it as early
 - Put the most important takeaways in a short section at the very end of the response.
 - I read from bottom to top, so the final section should work as a compact summary of the whole answer.
 - That final section should contain the key result, important caveats, and anything I should remember or act on.
+
+## Time And Feedback Loops
+
+- When a `/goal` is created, or when a task is expected to take more than 30 minutes, immediately create a recurring heartbeat automation for the current Codex task. Run it every 30 minutes until the goal is complete or blocked. Its prompt must inspect the current goal's elapsed time, restate the shortest remaining critical path, identify any repeated or slow feedback cycle, and force an explicit decision to continue, change the approach, or stop work that is no longer on the critical path. Delete or disable the automation when the goal reaches a terminal state.
+- Treat each time-review heartbeat as an interruption point, not a passive reminder. Pause the current loop, report the elapsed time and current bottleneck to the user, and make a concrete change when the approach is not converging fast enough.
+- Treat elapsed time as a first-class constraint. Before substantial work, identify the shortest path to a reliable result and prefer the cheapest high-signal check first.
+- Build a fast local or isolated feedback loop before relying on repeated commits, CI runs, deployments, remote provisioning, or other slow external cycles. Use production primarily for the final proof and for behavior that genuinely cannot be reproduced elsewhere.
+- If one feedback cycle takes more than five minutes, avoid repeating it unchanged. After the second slow or inconclusive cycle, stop and reassess the hypothesis, architecture, instrumentation, and test boundary before trying again.
+- When a task takes materially longer than expected, explicitly reconsider the approach instead of treating persistence as permission to repeat the same expensive loop. Look for ways to split blocking setup from readiness, add focused diagnostics, test components independently, or reduce the number of deploys.
+- Track the critical path and elapsed time during long tasks. Keep the user informed when the estimate changes, state what is consuming the time, and explain the concrete change being made to shorten the remaining loop.
+- Do not sacrifice required verification, but make verification proportional and staged: focused checks first, broader gates once the approach is stable, and one realistic end-to-end confirmation at the end.
 
 ## Verification
 
