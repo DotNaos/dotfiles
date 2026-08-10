@@ -51,6 +51,7 @@ dotfiles_init_completions() {
   dotfiles_load_generated_completion codex codex completion zsh
   dotfiles_load_generated_completion dotfiles dotfiles completion zsh
   dotfiles_load_generated_completion project project completion zsh
+  dotfiles_load_generated_completion tailscale tailscale completion zsh
   dotfiles_load_generated_completion uv uv generate-shell-completion zsh
   dotfiles_load_generated_completion uvx uvx --generate-shell-completion zsh
   dotfiles_load_generated_completion worktree worktree completion zsh
