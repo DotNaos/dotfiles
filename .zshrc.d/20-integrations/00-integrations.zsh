@@ -25,7 +25,14 @@ zinit snippet OMZP::poetry
 zinit snippet OMZP::npm
 zinit snippet OMZP::ansible
 zinit snippet OMZP::jj
+########################## >>>>> Dotenv
+# Set plugin to auto load .env files and don't ask
+export ZSH_DOTENV_PROMPT=false
+
+# Plugin
 zinit snippet OMZP::dotenv
+########################### <<<<< Dotenv
+
 zinit snippet OMZP::git-extras
 
 if has thefuck; then
