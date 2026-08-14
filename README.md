@@ -85,29 +85,25 @@ To inspect or apply only the Codex files:
 ## Secrets and env
 
 - Vault references and secret values never live in this repository.
-- Normal shell startup does not load a service-account token, secret file, or
-  1Password SSH agent.
-- Codex shells load the read-only token from the unversioned
-  `~/.config/1password/op/service-account.env` file.
-- Set `CODEX_DONT_USE_1PASSWORD_SERVICE_ACCOUNT=1` or
-  `OP_SERVICE_ACCOUNT_DISABLED=1` when an interactive desktop approval is
-  required instead.
-- The unversioned `~/.config/1password/op/.env` file contains the user's Vault
-  references. It is loaded only when `loadsecrets` is run explicitly.
+- Shell startup explicitly removes inherited 1Password service-account and
+  Infisical machine-token variables. Human Infisical login state stays in the
+  macOS Keychain.
+- Local development uses the delete-protected `Local Development` Infisical
+  project. It does not create identities or tokens.
+- Personal 1Password use, the desktop app, and its SSH agent are outside this
+  development-secret path and remain available when explicitly requested.
 
 Available commands:
 
 ```bash
-loadsecrets
-listsecrets
+withsecrets <command> [argument ...]
 env-load .env .env.local
 ```
 
 Notes:
 
-- `loadsecrets` sources the local reference file into the current shell. It does
-  not resolve the references into secret values.
-- `listsecrets` prints only the configured environment-variable names.
+- `withsecrets` authenticates as the signed-in human, injects the Local
+  Development values only into the child process, and writes no `.env` file.
 - `env-load` remains a generic, explicit project env-file loader.
 
 ## Smoke checks

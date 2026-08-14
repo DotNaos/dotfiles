@@ -61,7 +61,8 @@ mcp_servers.agentation.command = "npx"
 mcp_servers.agentation.args = ["-y", "agentation-mcp", "server", "--mcp-only", "--http-url", "http://localhost:4747"]
 mcp_servers."apple-services".command = "node"
 mcp_servers."apple-services".args = ["/Users/oli/projects/apple-services-mcp/dist/index.js"]
-mcp_servers.onshape.command = "sh"
-mcp_servers.onshape.args = ["-lc", 'export ONSHAPE_MCP_AUTH__ACCESS_KEY="$(op read "op://Personal/Onshape/Onshape API/access key")"; export ONSHAPE_MCP_AUTH__SECRET_KEY="$(op read "op://Personal/Onshape/Onshape API/secret key")"; export ONSHAPE_MCP_AUTH__METHOD=basic; exec /Users/oli/.cargo/bin/onshape-mcp']
+mcp_servers.onshape.command = "infisical"
+mcp_servers.onshape.args = ["run", "--silent", "--log-level=error", "--domain=https://eu.infisical.com", "--projectId=1ef8b9fc-7905-4a9c-a92b-2d19d2446927", "--env=dev", "--", "/Users/oli/.cargo/bin/onshape-mcp"]
+mcp_servers.onshape.env.ONSHAPE_MCP_AUTH__METHOD = "basic"
 mcp_servers.sona.command = "/Users/oli/go/bin/sona"
 mcp_servers.sona.args = ["mcp"]
