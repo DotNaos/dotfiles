@@ -10,7 +10,19 @@ alias docker-removeall='docker rm $(docker ps -a -q)'
 alias code='code-insiders'
 alias uijj='lazyjj'
 alias wt='worktree'
-alias loadsecrets='source "$HOME/.config/1password/op/.env"'
-alias listsecrets='sed -nE '\''s/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*/\2/p'\'' "$HOME/.config/1password/op/.env"'
+
+withsecrets() {
+  if (( $# == 0 )); then
+    print -u2 'usage: withsecrets <command> [argument ...]'
+    return 64
+  fi
+  command infisical run \
+    --silent \
+    --log-level=error \
+    --domain=https://eu.infisical.com \
+    --projectId=1ef8b9fc-7905-4a9c-a92b-2d19d2446927 \
+    --env=dev \
+    -- "$@"
+}
 
 safe_source "${ZDOTDIR:-$HOME}/.zsh_aliases"
