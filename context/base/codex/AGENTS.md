@@ -52,7 +52,7 @@ This is the primary operating protocol for every Codex task. Execute it as early
 
 ### Title rules
 
-- Put the actual GitHub issue number first. When numbered, append the task number directly as `/1`, `/2`, and so on.
+- Put the actual GitHub issue number first, except for the task-status prefixes defined below. When numbered, append the task number directly as `/1`, `/2`, and so on.
 - Do not add `/1` while an issue has only one task. When a second task appears, re-list both active and archived tasks for that issue immediately before renaming, rename the original to `/1`, and assign the new task the next positive number above the highest number ever recorded for that issue. Treat every number found in active or archived task history as permanently reserved.
 - If complete active and archived task history cannot be queried, do not invent or reuse a task number; leave the current title unchanged, report that allocation is unavailable, and continue the actual task.
 - If concurrent tasks claim the same number, the task with the earlier `createdAt` value keeps it; break an exact timestamp tie by the lexicographically smaller thread ID. Every other colliding task must re-list the complete issue-task history and move above the highest reserved number before continuing.
@@ -65,6 +65,29 @@ This is the primary operating protocol for every Codex task. Execute it as early
 - For handoffs and existing ambiguous tasks, keep the issue number, task number, and claimed agent name stable, but rewrite the purpose so every still-visible task remains distinguishable.
 - One Codex task should have one primary GitHub issue. Split independent issues into separate Codex tasks.
 - Questions, brief research, administrative actions, and genuinely trivial changes do not require artificial GitHub issues.
+
+### Task status in titles
+
+- Each Codex task owns its status and must derive it from its actual objective and current evidence. Use exactly one of these optional prefixes at the very beginning of the existing complete title: `INPUT ·`, `WAITING ·`, `BLOCKED ·`, or `DONE ·`.
+- While a turn is actively running, use no status prefix. The Codex activity spinner already communicates active work. Remove `INPUT ·`, `WAITING ·`, or `BLOCKED ·` before starting or resuming work.
+- Use `INPUT ·` only after the current turn has ended when the task cannot continue without a response, decision, approval, credential-side action, or other intervention from the user.
+- Use `WAITING ·` only after the current turn has ended and a concrete automatic continuation has actually been arranged, such as a task heartbeat, monitor, scheduled wake-up, or another reliable event that will resume the task. Never use `WAITING ·` merely because CI, a deployment, a command, or another slow operation is still running inside the current turn. If no automatic re-entry exists, use `INPUT ·` or `BLOCKED ·` instead.
+- Use `BLOCKED ·` only after the current turn has ended when no safe self-directed path remains and a simple user reply or approval would not resolve the obstacle. State the blocker and shortest remaining critical path in the task. If the user can unblock it directly, use `INPUT ·`.
+- Use `DONE ·` when the objective is achieved and no required work remains in that task:
+  - With an issue: `DONE · #<issue-number>[/<task-number>] · AgentName · Short specific purpose`
+  - Without an issue: `DONE · AgentName · Short specific objective`
+- Do not mark a task `DONE` while its required implementation, review, approval, merge, release, deployment, verification, or follow-up is still outstanding. An explicitly report-only or handoff-only task may be `DONE` once the report is delivered or the successor has accepted ownership and the handoff itself is verified.
+- A status prefix always appears exactly once at the very beginning so it remains visible before sidebar truncation. Replace the old prefix when status changes; never stack prefixes. Preserve the issue number, task number, agent name, and purpose unchanged after the prefix.
+- Status prefixes are visual Codex task state only. They do not archive the task, close a GitHub issue, merge a pull request, or prove deployment by themselves.
+- If later user input reopens or extends a `DONE` task, remove `DONE ·` before resuming work. Add it again only after the new objective is genuinely complete.
+
+### Capture discovered bugs and follow-up work immediately
+
+- When investigation reveals a real defect in code, configuration, automation, documentation, or durable system behavior that requires follow-up work, capture it immediately in the owning repository. Search for an existing issue first; update that issue when it already covers the finding, otherwise create a focused new bug or task while the evidence is still fresh.
+- Record enough evidence for another task to act without rediscovering the problem: the observed behavior, the expected behavior, the affected entry point or boundary, reliable reproduction or diagnostics, impact, and any known safety or delivery constraint. Never include secrets or other sensitive values.
+- If the defect is independent from the current task, keep its implementation in a separate Codex task and Project-managed worktree. Creating or updating the tracking issue must not silently widen the current task's implementation scope.
+- Do not create issues for transient environmental conditions that do not indicate a product defect and require no durable action, such as a temporarily unreachable personal router, a short-lived network outage, or an isolated third-party service interruption. Create an issue only when the condition exposes a reproducible defect, needs a code or configuration change, or requires a durable operational follow-up.
+- If every issue-writing surface is temporarily unavailable, preserve a ready-to-file issue draft in the current task, retry through the next available authorized surface, and do not report the work as complete until the finding is either tracked or explicitly handed back as a blocker.
 
 ## Subagents
 
@@ -151,8 +174,6 @@ Do not hand over unverified work when you can check it yourself with the tools a
 ## UI And UX
 
 - When building UI, model the transitions and animations between screens after real life physical concepts like springs, or physical systems.
-- For new screens or larger UI changes, create mockups first with the `imagegen` skill before implementation. Prefer 3 variants labeled A, B, and C, show them to me, and wait for me to choose one before writing code. Do not require mockups for small UI fixes, minor layout tweaks, copy changes, or straightforward component adjustments.
-- Treat generated UI mockups as direction, not a literal specification. They often contain hallucinated controls, text, spacing, or data. When implementing the chosen variant, extract the intended layout and interaction pattern, then adapt it to the real product constraints, existing data, existing components, and the specific feature request.
 - Use [@Browser](plugin://browser@openai-bundled) as the default way to test browser-based web UIs, and always test UI work before handing it back to me.
 - For iOS Simulator work, use `build-ios-apps:ios-simulator-browser` together with [@Browser](plugin://browser@openai-bundled) as the required default way to view, interact with, and visually verify the simulator. Do not use the normal Simulator app window, raw simulator screenshots, Xcode Canvas, `Computer Use`, or ad hoc simulator viewing as the default path. Build/install commands may still target a simulator, but visual work and proof should go through the Browser-mirrored simulator unless this skill is genuinely unavailable or unsuitable.
 - iOS Simulator Browser workflow: first obtain an explicit Simulator UDID from the current build/run flow or `xcrun simctl list devices available`; then start `serve-sim` in a long-running terminal pinned to that UDID with a scoped cleanup trap:
