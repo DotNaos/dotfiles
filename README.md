@@ -8,16 +8,17 @@ git clone https://github.com/DotNaos/dotfiles.git ~/dotfiles
 
 1. Setup
 
-This automatically detects your platform and checks for sudo access to pick the right setup path for you.
+This detects your context and configures your user home only. It does not install
+packages, use `sudo`, change `/etc`, or run system hooks. Systems own machine
+and package provisioning.
 
 ```bash
-./dotfiles/setup
+./dotfiles/setup --config-only
 ```
 
-On Linux/WSL, the setup installs base packages with `apt` when available and then
-adds the shared CLI toolchain with a user-local Linuxbrew under `~/.linuxbrew`.
-
-Platform-specific system notes (e.g., macOS Touch ID for `sudo`) live in `docs/system/`.
+`./setup --config-only` is the stable entry point for system automation. The
+default `./setup` is also config-only for compatibility. Add `--dry-run` to
+inspect the planned rendering and links without changing the home.
 
 Persistent context preferences live in `~/.config/dotfiles/context.env`.
 Environment variables still override that file when you need a one-off run.
@@ -115,12 +116,11 @@ bash -n setup
 bash -n scripts/setup
 bash -n scripts/link-home
 bash -n scripts/render-configs
-bash -n scripts/system/apply
-bash -n scripts/system/macos
-find scripts/system -type f -perm -111 -print0 | xargs -0 -n1 bash -n
+bash -n scripts/smoke-config-only
 zsh -n .zshenv
 zsh -n .zshrc
 find .zshrc.d -type f -name '*.zsh' -print0 | xargs -0 -n1 zsh -n
 ./scripts/render-configs --dry-run
-./setup --dry-run
+./setup --config-only --dry-run
+./scripts/smoke-config-only
 ```
