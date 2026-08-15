@@ -2,69 +2,45 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SETUP_SCRIPT="$ROOT_DIR/scripts/setup"
 LINK_SCRIPT="$ROOT_DIR/scripts/link-home"
-
-# shellcheck source=scripts/lib/context.sh
-source "$ROOT_DIR/scripts/lib/context.sh"
-
+DIAGNOSTICS_SCRIPT="$ROOT_DIR/scripts/setup"
 DRY_RUN=0
-EXPLICIT_MODE=0
-ARGS=()
-
-log() {
-  printf '[setup-entry] %s\n' "$*"
-}
-
-has_sudo_access() {
-  if ! command -v sudo >/dev/null 2>&1; then
-    return 1
-  fi
-
-  sudo -n true >/dev/null 2>&1
-}
-
-has_apt_get() {
-  command -v apt-get >/dev/null 2>&1
-}
+CONFIG_ONLY=0
 
 for arg in "$@"; do
-  if [[ "$arg" == "--dry-run" ]]; then
-    DRY_RUN=1
-  fi
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    --config-only) CONFIG_ONLY=1 ;;
+    -h|--help)
+      cat <<'USAGE'
+Usage: ./setup --config-only [--dry-run]
 
-  if [[ "$arg" == "--rootless" || "$arg" == "--only" ]]; then
-    EXPLICIT_MODE=1
-  fi
-
-  ARGS+=("$arg")
-done
-
-dotfiles_load_context
-
-if [[ "$EXPLICIT_MODE" -eq 0 ]]; then
-  case "$DOTFILES_PLATFORM" in
-    wsl)
-      if has_apt_get && has_sudo_access; then
-        ARGS+=("--only" "wsl")
-      else
-        ARGS+=("--only" "wsl" "--rootless")
-      fi
+Configure the user home from this repository. The setup never installs packages,
+uses sudo, changes system files, or runs system hooks.
+USAGE
+      exit 0
       ;;
-    linux)
-      if has_apt_get && has_sudo_access; then
-        ARGS+=("--only" "linux")
-      else
-        ARGS+=("--only" "linux" "--rootless")
-      fi
+    *)
+      printf '[setup-entry] Unknown argument: %s\n' "$arg" >&2
+      exit 1
       ;;
   esac
+done
+
+if [[ "$CONFIG_ONLY" -ne 1 ]]; then
+  printf '[setup-entry] Continuing in config-only mode; use --config-only for the stable interface.\n'
 fi
 
+diagnostic_args=(--config-only)
+link_args=()
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  diagnostic_args+=(--dry-run)
+  link_args+=(--dry-run)
+fi
+
+"$DIAGNOSTICS_SCRIPT" "${diagnostic_args[@]}"
 if [[ "$DRY_RUN" -eq 1 ]]; then
   "$LINK_SCRIPT" --dry-run
 else
   "$LINK_SCRIPT"
 fi
-
-exec "$SETUP_SCRIPT" "${ARGS[@]}"

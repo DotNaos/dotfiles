@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-config-only.XXXXXX")"
+trap 'rm -rf "$TEST_HOME"' EXIT
+
+HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" \
+  "$ROOT_DIR/setup" --config-only
+
+test -L "$TEST_HOME/.zshrc"
+test -L "$TEST_HOME/.config/zed"
+test -f "$TEST_HOME/.local/state/dotfiles/rendered/.codex/config.toml"
+printf 'config-only smoke passed\n'
