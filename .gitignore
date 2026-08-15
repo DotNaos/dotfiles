@@ -19,8 +19,7 @@ tools/dotfiles/dotfiles
 # Editor and assistant local state (never portable configuration)
 .zshrc.swp
 .claude/settings.local.json
-context/base/.config/zed/prompts/prompts-library-db.0.mdb/data.mdb
-context/base/.config/zed/prompts/prompts-library-db.0.mdb/lock.mdb
+context/base/.config/zed/prompts/prompts-library-db.*.mdb/
 context/base/.config/zed/settings_backup.json
 
 # KDE directory preferences

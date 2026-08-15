@@ -34,9 +34,12 @@ check_prerequisites() {
 
   if [[ "${#missing[@]}" -eq 0 ]]; then
     log "Configuration prerequisites are available."
-  else
-    log "Missing configuration prerequisites: ${missing[*]}"
+    return 0
   fi
+
+  log "Missing configuration prerequisites: ${missing[*]}"
+  log "Install these prerequisites through your system provisioning and rerun ./setup --config-only."
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
