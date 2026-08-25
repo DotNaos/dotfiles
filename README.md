@@ -44,6 +44,27 @@ Managed app configs are rendered from `context/base/` plus optional overlays in:
 - `context/mode/<mode>/`
 - `context/shell/<shell>/`
 
+## SSH
+
+The shared `~/.ssh/config` is installed on both graphical clients and headless
+systems. Short names are canonicalized only when they contain no dots:
+
+```bash
+ssh os-pc
+```
+
+resolves through:
+
+```text
+os-pc.vpn.os-home.net
+```
+
+The configuration contains no device IP addresses or device-specific key
+mapping. Tailscale and the authoritative `vpn.os-home.net` records remain the
+source of truth. Existing conflicting `~/.ssh/config` files are backed up by the
+normal dotfiles linker before the managed file is linked, and `~/.ssh` is kept
+at mode `700`.
+
 ## Codex
 
 Global Codex guidance and configuration use the same context renderer and home
