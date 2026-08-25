@@ -14,6 +14,7 @@ source "$ROOT_DIR/scripts/lib/context.sh"
 
 LINK_ITEMS=(
   ".jj"
+  ".ssh/config"
   ".tmux.conf"
   ".zsh"
   ".zsh_aliases"
@@ -223,6 +224,9 @@ link_item() {
   fi
 
   ensure_parent_dir "$target_path"
+  if [[ "$relative_path" == .ssh/* ]]; then
+    run "chmod 700 '$TARGET_HOME/.ssh'"
+  fi
 
   if [[ -L "$target_path" ]]; then
     local current_target
