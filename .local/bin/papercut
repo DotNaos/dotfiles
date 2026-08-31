@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: papercut --model <model> "<message>"
+
+Record a small piece of workflow friction in the current repository's
+PAPERCUTS.md. If no message argument is provided, the message is read from stdin.
+USAGE
+}
+
+fail() {
+  printf 'papercut: %s\n' "$1" >&2
+  exit 1
+}
+
+model=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -m|--model)
+      [[ $# -ge 2 ]] || fail "missing value for $1"
+      model="$2"
+      shift 2
+      ;;
+    --model=*)
+      model="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      fail "unknown option: $1"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+[[ -n "${model//[[:space:]]/}" ]] || fail "--model is required"
+
+if [[ $# -gt 0 ]]; then
+  message="$*"
+elif [[ ! -t 0 ]]; then
+  message="$(cat)"
+else
+  fail "message is required"
+fi
+
+[[ -n "${message//[[:space:]]/}" ]] || fail "message must not be empty"
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "must run inside a Git repository"
+author="$(git config user.name 2>/dev/null || true)"
+[[ -n "${author//[[:space:]]/}" ]] || author="unknown"
+
+model="${model//$'\n'/ }"
+author="${author//$'\n'/ }"
+timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+log_file="$repo_root/PAPERCUTS.md"
+
+[[ ! -L "$log_file" ]] || fail "refusing to write through a PAPERCUTS.md symlink"
+if [[ -e "$log_file" && ! -f "$log_file" ]]; then
+  fail "PAPERCUTS.md is not a regular file"
+fi
+
+entry=""
+if [[ ! -s "$log_file" ]]; then
+  entry+=$'# Papercuts\n'
+fi
+entry+=$'\n## '"$timestamp"$' — '"$model"$' — '"$author"$'\n\n'"$message"$'\n'
+
+printf '%s' "$entry" >> "$log_file"
+printf 'Recorded papercut in %s\n' "$log_file"

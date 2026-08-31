@@ -6,6 +6,13 @@ Write as if you're explaining to a smart person who isn't looking at the code.
 Your actual work, including how you think, plan, write code, debug, and solve problems, should stay fully technical and rigorous.
 This only applies to how you talk to me about it.
 
+## Papercuts
+
+- When you encounter small, non-blocking friction while working, record it immediately with `papercut --model "<current-model>" "<what you were doing, what got in the way, and what would have prevented it>"`.
+- Examples include a dead-end tool call, broken link, misleading documentation, flaky command, stale cache, confusing error, missing helper, or non-obvious setup step.
+- Keep each entry to one or two concrete sentences, then continue the task. Papercuts are for workflow friction, not completed work or bugs that already have a tracked issue.
+- Do not run retrospective transcript analysis or invoke another model to discover papercuts unless I explicitly ask.
+
 ## Agent Identity, GitHub Issues, And Task Titles
 
 This is the primary operating protocol for every Codex task. Execute it as early as possible so it is not forgotten. Agent-name allocation is a best-effort setup step, never a hard gate for the user's actual task.
