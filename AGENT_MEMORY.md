@@ -17,6 +17,22 @@ a work-local service are separate scopes. Do not add a private endpoint to work
 profiles, copy credentials between machines, expose a service publicly, or
 create an isolated local store merely to make a connection check pass.
 
+## Work-only isolation
+
+A work machine needs its own memory system: service, data root, indexes, backups,
+and access configuration. A project tag or filter inside the personal store is
+not an isolation boundary. Do not register the personal memory connector in a
+work profile or send work queries/context to it. If the work connection cannot
+be verified, continue without memory.
+
+Do not sync, mirror, import, or copy memories in either direction. Keep work
+backup destinations and source-ingestion jobs separate from personal ones. This
+includes local Codex memories and other automatic context publishers: they must
+not publish work context into a personal store. Installing a bootstrap rule does
+not establish that isolation; verify the actual work deployment and client
+profile using an explicitly authorized access method. Do not attempt remote
+access to a work machine when the user prohibits it.
+
 ## Verify each client
 
 1. Load `memory_instructions` through that client's configured Agent Memory tool.
