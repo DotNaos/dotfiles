@@ -19,6 +19,19 @@ create an isolated local store merely to make a connection check pass.
 
 ## Work-only isolation
 
+`os-work` (including WSL) and `os-yoga` / `os-yoga-unix` identify different OS
+installations on the same physical work device. Neither installation may connect
+to `os-vps`, directly or indirectly through a proxy, tunnel, relay, or another
+personal machine. Work-memory processing, storage, indexes, and backups must all
+stay on the work device. An offline `os-yoga` is not a pending personal-memory
+client to provision when it comes online. Do not access either installation
+remotely without a new explicit user instruction.
+
+These are deployment and network requirements, not proof of technical
+enforcement. Instruction files cannot establish firewall isolation. Verify
+network restrictions and the work-local deployment only through an access path
+that the user has expressly authorized.
+
 A work machine needs its own memory system: service, data root, indexes, backups,
 and access configuration. A project tag or filter inside the personal store is
 not an isolation boundary. Do not register the personal memory connector in a
