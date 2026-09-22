@@ -19,13 +19,16 @@ create an isolated local store merely to make a connection check pass.
 
 ## Work-only isolation
 
-`os-work` (including WSL) and `os-yoga` / `os-yoga-unix` identify different OS
-installations on the same physical work device. Neither installation may connect
-to `os-vps`, directly or indirectly through a proxy, tunnel, relay, or another
-personal machine. Work-memory processing, storage, indexes, and backups must all
-stay on the work device. An offline `os-yoga` is not a pending personal-memory
-client to provision when it comes online. Do not access either installation
-remotely without a new explicit user instruction.
+`os-work` (including WSL) must not connect to `os-vps`, directly or indirectly
+through a proxy, tunnel, relay, or another personal machine. Work-memory
+processing, storage, indexes, and backups must stay local to the work
+installation. Do not access it remotely without a new explicit user instruction.
+
+`os-yoga` may be a private OS installation on the same physical device. Establish
+its exact host identity and role independently before configuring it. Shared
+hardware does not establish a shared network policy or memory scope. Do not
+classify it as either a work-memory or personal-memory client merely from its
+name or its relationship to `os-work`.
 
 These are deployment and network requirements, not proof of technical
 enforcement. Instruction files cannot establish firewall isolation. Verify
