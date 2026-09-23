@@ -9,8 +9,10 @@ in Agent Memory, not duplicated here.
 
 A ChatGPT-connected Agent Memory app can be available through Codex's app tools
 without a `mcp_servers.agent-memory` entry in `config.toml`. Check the actual
-client tools and a read request before adding another connection. Codex's
-`features.memories` setting controls its separate local memory feature.
+client tools and a read request before adding another connection. `codex mcp list`
+may omit app-provided tools, so an absent entry there alone does not show that
+Agent Memory is disconnected. Codex's `features.memories` setting controls its
+separate local memory feature.
 
 Use the client's existing authorized connection. The private shared service and
 a work-local service are separate scopes. Do not add a private endpoint to work
@@ -66,6 +68,15 @@ access to a work machine when the user prohibits it.
    installation is missing solely because remote login is unavailable.
 
 Connection checks do not require writing memory entries or importing data.
+
+On 2026-09-23, a fresh read-only Codex CLI session on personal `os-pc` successfully
+called the app-provided `agent_memory.memory_instructions` and
+`agent_memory.memory_recent` (`limit: 1`) tools. This verifies that client at that
+time; it does not prove other machines or future sessions are connected. Keep the
+app connection rather than adding a second local-store or guessed `os-vps` MCP
+entry. To recheck in the target client, request those same two read-only calls
+there and inspect their results. Do not publish returned memory contents in logs,
+issues, or pull requests.
 
 ## Apply managed instructions
 
