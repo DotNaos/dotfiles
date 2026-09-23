@@ -75,6 +75,10 @@ linker as the other managed applications:
 - `context/platform/<platform>/codex/config.toml` contains platform-specific
   additions such as desktop preferences and local launcher paths.
 
+Agent Memory's app connection, scope rules, and exact-client read check are
+documented in [AGENT_MEMORY.md](AGENT_MEMORY.md). An app-provided connection need
+not appear in `config.toml` or `codex mcp list`.
+
 Codex config layers use additive dotted keys. A platform layer may add settings
 but must not redefine a key from an earlier layer; conflicting keys stop the
 render instead of producing an ambiguous config. Global `AGENTS.md` guidance is
