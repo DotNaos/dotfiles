@@ -18,6 +18,8 @@ features.prevent_idle_sleep = true
 features.chronicle = false
 features.js_repl = false
 
+agents.max_concurrent_threads_per_session = 12
+
 commands.approve = ["git", "npm", "pnpm", "bun", "python"]
 tui.session_picker_view = "comfortable"
 
