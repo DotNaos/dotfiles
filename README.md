@@ -90,8 +90,10 @@ its configured MCP connection before first operational use. The host maintains
 the complete guide and capability snapshot; dotfiles keeps only the portable
 bootstrap rule. Cache `host_id`, connection/route, `version` and `content_version`
 in the session, refreshing when context or connection changes. An installed
-`remote-mcp --environment-instructions --json` is a permitted local fallback,
-not proof that a remote client connection works. Host capabilities, restrictions
+`remote-mcp --environment-instructions --json` is a permitted local fallback
+only when its installed version is known to support this discovery mode. Do not
+probe older binaries with unknown flags: they may start a server. A CLI snapshot
+is not proof that a remote client connection works. Host capabilities, restrictions
 on an execution route and human authorization remain separate.
 
 This repository currently manages the Codex entry point only. Other agents can
