@@ -84,6 +84,20 @@ but must not redefine a key from an earlier layer; conflicting keys stop the
 render instead of producing an ambiguous config. Global `AGENTS.md` guidance is
 managed only from the base layer.
 
+The global Environment Awareness rule establishes the local execution context
+and requires reading a remote host's versioned `environment_instructions` through
+its configured MCP connection before first operational use. The host maintains
+the complete guide and capability snapshot; dotfiles keeps only the portable
+bootstrap rule. Cache `host_id`, connection/route, `version` and `content_version`
+in the session, refreshing when context or connection changes. An installed
+`remote-mcp --environment-instructions --json` is a permitted local fallback,
+not proof that a remote client connection works. Host capabilities, restrictions
+on an execution route and human authorization remain separate.
+
+This repository currently manages the Codex entry point only. Other agents can
+receive the host's guide through the same MCP discovery contract; no Claude or
+Copilot configuration migration is introduced here.
+
 The renderer writes only `AGENTS.md` and `config.toml` into
 `~/.local/state/dotfiles/rendered/.codex/`. The linker then links those two files
 individually into `~/.codex/` and backs up conflicting targets. It never links or
