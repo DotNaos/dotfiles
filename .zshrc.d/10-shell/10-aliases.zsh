@@ -16,12 +16,11 @@ withsecrets() {
     print -u2 'usage: withsecrets <command> [argument ...]'
     return 64
   fi
-  command infisical run \
+  command doppler run \
     --silent \
-    --log-level=error \
-    --domain=https://eu.infisical.com \
-    --projectId=1ef8b9fc-7905-4a9c-a92b-2d19d2446927 \
-    --env=dev \
+    --no-fallback \
+    --project=local-development \
+    --config=dev \
     -- "$@"
 }
 
