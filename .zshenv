@@ -12,10 +12,9 @@ safe_source "${DOTFILES_ROOT}/scripts/lib/context.sh"
 safe_source "${ZDOTDIR:-$HOME}/.zshrc.d/00-core/00-core.zsh"
 safe_source "${ZDOTDIR:-$HOME}/.zshrc.d/10-shell/00-paths.zsh"
 
-# Secret-manager sessions remain in the macOS Keychain. Shell startup never
+# Secret-manager sessions remain in the provider's local login store. Shell startup never
 # loads a long-lived machine credential into the environment.
 unset OP_SERVICE_ACCOUNT_TOKEN
-unset INFISICAL_TOKEN
-export INFISICAL_DOMAIN="https://eu.infisical.com"
+unset DOPPLER_TOKEN
 
 unfunction safe_source

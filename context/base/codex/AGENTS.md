@@ -234,10 +234,10 @@ Do not hand over unverified work when you can check it yourself with the tools a
 
 ## Secrets And Logins
 
-- Development secrets live in Infisical. Local development uses the signed-in human session from the macOS Keychain and `infisical run`; never persist `INFISICAL_TOKEN` in a file or shell startup.
-- CI, Preview, Production, release signing, and VPS workloads use fixed, named, least-privilege Infisical identities. Provision their authentication explicitly; never let a workflow, script, agent, or setup command create an identity, client secret, or access token automatically.
+- Development secrets live in Doppler. Local development uses the existing signed-in human Doppler CLI session and `doppler run --no-fallback`; never persist `DOPPLER_TOKEN` in a repository file or shell startup. Run `doppler login` only as an explicit authentication action, never automatically while opening a chat or starting a tool.
+- CI, Preview, Production, release signing, and VPS workloads use fixed, named, least-privilege Doppler service accounts or scoped service tokens. Provision their authentication explicitly; never let a workflow, script, agent, or setup command create an identity, client secret, or access token automatically.
 - Prefer short-lived OIDC for GitHub Actions. A server identity may receive a separately approved, rotatable credential only when workload-native authentication is unavailable. Never reuse one identity across ownership boundaries.
-- Do not hardcode or expose any secret in files, source code, command arguments, shell history, logs, terminal transcripts, or final responses. Prefer `infisical run` and pass secrets to downstream commands through protected standard input or environment variables without printing them.
+- Do not hardcode or expose any secret in files, source code, command arguments, shell history, logs, terminal transcripts, or final responses. Prefer `doppler run --no-fallback` and pass secrets to downstream commands through protected standard input or environment variables without printing them.
 - 1Password is not a development secret provider. Personal vault contents, the desktop app, SSH agent, personal SSH keys, and explicitly requested personal or sudo credential reads remain separate and must not be deleted.
 - When a remote machine requires `sudo` and passwordless sudo is not explicitly intended, use the 1Password CLI to access the host-specific sudo credential instead of asking me to paste the password into chat. If the credential cannot be passed to the remote command without exposure, stop and explain the blocker.
 - Never put sudo passwords in command arguments, shell history, source files, logs, terminal transcripts, or final responses.

@@ -128,10 +128,10 @@ To inspect or apply only the Codex files:
 
 - Vault references and secret values never live in this repository.
 - Shell startup explicitly removes inherited 1Password service-account and
-  Infisical machine-token variables. Human Infisical login state stays in the
-  macOS Keychain.
-- Local development uses the delete-protected `Local Development` Infisical
-  project. It does not create identities or tokens.
+  Doppler machine-token variables. Human Doppler login state stays in the
+  Doppler CLI's local login store.
+- Local development uses the `local-development` Doppler project and `dev`
+  config. It does not create identities or tokens.
 - Personal 1Password use, the desktop app, and its SSH agent are outside this
   development-secret path and remain available when explicitly requested.
 
@@ -144,8 +144,14 @@ env-load .env .env.local
 
 Notes:
 
-- `withsecrets` authenticates as the signed-in human, injects the Local
-  Development values only into the child process, and writes no `.env` file.
+- `withsecrets` uses the existing Doppler login, injects `local-development/dev`
+  values only into the child process, and writes no `.env` or fallback file.
+  Sign in explicitly with `doppler login` when needed; shell startup never
+  starts a browser login.
+- For another project's secrets, use its configured directory and run
+  `doppler run --no-fallback -- <command>` directly. Doppler's
+  [directory scopes](https://docs.doppler.com/docs/secrets-setup-guide) select
+  its project and config; `withsecrets` always selects local development.
 - `env-load` remains a generic, explicit project env-file loader.
 
 ## Smoke checks
