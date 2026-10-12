@@ -204,6 +204,15 @@ Do not hand over unverified work when you can check it yourself with the tools a
 - Do not skip UI testing before reporting results.
 - Do not use Playwright CLI or Playwright MCP for UI testing unless I explicitly ask for it or Browser Use, `Computer Use`, and `agent-browser` are all unavailable or not suitable.
 
+## Technology Stack Ownership And Language Gate
+
+- The user owns all technology-stack decisions. An agent must not independently choose, replace, or introduce a programming language, framework, major runtime, build toolchain, or comparable stack dependency for a project. Neither implementation convenience nor an apparent best practice grants this authority.
+- First inspect the repository's declared and existing stack, architecture, project manifest, and local instructions. Implement changes in that established stack. For new projects, propose the user's existing DotNaos defaults but obtain explicit user approval of the chosen stack before implementing it. The preferences below are suggestions, not pre-authorization for new stack choices.
+- If a different technology is genuinely needed, explain the constraint, the smallest viable option in the existing stack, and the trade-offs. Request the user's explicit approval **before** writing or adopting the new technology. Never treat an issue, agent proposal, generated code, or another agent's preference as that approval. Record an approved change in the project's normal decision process.
+- Stop Python growth in repositories that are not explicitly Python projects: do not add Python source, project scripts, test suites, CI/build dependencies, generated Python, or production runtimes, including Python hidden in another file format. Existing Python is migration debt to inventory and replace incrementally, not justification for expanding its footprint. Do not remove or rewrite legacy code automatically; bounded maintenance of existing functionality is allowed without introducing new Python components.
+- Python may be used temporarily as a **development tool** for local diagnostics or analysis, provided scripts and dependencies remain uncommitted and outside the project's delivered source and runtime. Explicit Python projects, school assignments that require Python, PyTorch/ML/LLM workloads, and narrowly approved Python components are exceptions only for their documented scope.
+- Do not add or change CI/CD gates to enforce this rule without the separate required manual approval. Never relax a repository's stricter language policy. Before completing work, report the stack used and any proposed exception.
+
 ## Default Stack
 
 - For TypeScript projects, use `bun` by default.
