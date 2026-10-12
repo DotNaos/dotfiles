@@ -28,6 +28,13 @@ again if it is already inside that window. Provider response-creation timestamps
 and token counts may add observational sub-boundaries; they do not independently
 measure queueing, scheduling or inference time. State when those fields are absent.
 
+For startup, retain the reported time to first token and the remaining time until
+the first dispatch. Only subtract them when their boundaries are compatible;
+otherwise report the mismatch. The token may be a provider response token rather
+than visible commentary. Numeric input, cached-input and output token counts,
+and first-call argument byte counts, can inform a hypothesis; they do not measure
+queueing, context processing or code generation separately. Export counts only.
+
 Export only durations, counts, validated statuses and tool names. Keep source
 inspection local to the authorized installation. Do not copy raw session logs,
 conversation or reasoning text, tool arguments, outputs, live configuration,
@@ -68,6 +75,12 @@ connection details or credentials into reports or external telemetry.
 9. Once prerequisites have been read and verified, set the recipe inputs and run
    it in the same awaited call. A dispatch that only stores already-decided inputs
    adds a handoff without adding evidence. Keep required decision boundaries.
+10. Keep initial orchestration short and reuse an already reviewed launch recipe
+    when available. Defer unrelated prepared-source reads to the next existing
+    prerequisite batch, preserving the identity workflow and all complete guide
+    reads. Do not add a dispatch merely to make the first one smaller. Compare
+    startup, identity completion, later gaps and total runtime; shifting a pause
+    to a later stage is not an improvement.
 
 Keep model settings and safety handling unchanged for an initial comparison.
 Changing those settings requires a separate decision and makes the original
@@ -85,6 +98,10 @@ Use several samples when practical and acknowledge ordering, warm-state and
 model-run variability. A startup failure or missing tools is an invalid
 performance sample, not a successful fast run. Do not weaken safeguards or
 silently change a model or route to obtain a passing result.
+
+If reusable diagnostic or launch preparation happened before a timed run, state
+that exclusion. Count preparation in one-off task cost; do not advertise the
+repeated-run result as the cost of building and running a new workflow each time.
 
 Persistent cross-task telemetry, UI timing breakdowns and automatic performance
 audits remain separate work owned by Project Space issue #882. This protocol and
