@@ -85,7 +85,14 @@ added_lines() {
 }
 has_added_lines() {
   git -C "$root" diff --no-ext-diff --unified=0 "$baseline" -- "$1" |
-    awk '/^\+\+\+ / {next} /^\+/ {found=1; exit} END {exit !found}'
+    awk '/^\+\+\+ / {next} /^\+/ {found=1} END {exit !found}'
+}
+is_new_file() {
+  [[ "$2" == untracked ]] ||
+    ! git -C "$root" cat-file -e "$baseline:$1" 2>/dev/null
+}
+has_interpreter_reference() {
+  grep -Ev '^[[:space:]]*(#|//|python_command=)' | grep -Eq "$python_command"
 }
 
 new_count=0
@@ -97,14 +104,9 @@ scan_file() {
   absolute="$root/$file"
   [[ -e "$absolute" || -L "$absolute" ]] || return 0
 
-  is_new=0
-  if [[ "$kind" == untracked ]] || ! git -C "$root" cat-file -e "$baseline:$file" 2>/dev/null; then
-    is_new=1
-  fi
-
   case "$file" in
     *.py|*.pyw|*.pyi|*.py.template|*.ipynb)
-      if [[ "$is_new" -eq 1 ]]; then
+      if is_new_file "$file" "$kind"; then
         printf 'NEW_PYTHON_FILE  %s\n' "$file"
         ((new_count+=1))
       elif has_added_lines "$file"; then
@@ -116,7 +118,7 @@ scan_file() {
     pyproject.toml|*/pyproject.toml|requirements*.txt|*/requirements*.txt|\
     Pipfile|*/Pipfile|Pipfile.lock|*/Pipfile.lock|poetry.lock|*/poetry.lock|\
     uv.lock|*/uv.lock|.python-version|*/.python-version|tox.ini|*/tox.ini)
-      if [[ "$is_new" -eq 1 ]]; then
+      if is_new_file "$file" "$kind"; then
         printf 'PYTHON_MANIFEST  %s (new, review exemption)\n' "$file"
         ((new_count+=1))
       elif has_added_lines "$file"; then
@@ -132,7 +134,7 @@ scan_file() {
   first_line=""
   IFS= read -r first_line < "$absolute" || :
   if [[ "$first_line" == '#!'* && "$first_line" == *python* ]]; then
-    if [[ "$is_new" -eq 1 ]] || [[ "$kind" == untracked ]] ||
+    if is_new_file "$file" "$kind" ||
       added_lines "$file" | grep -Eq '^#!.*python'; then
       printf 'PYTHON_SHEBANG  %s\n' "$file"
       ((entry_count+=1))
@@ -145,14 +147,17 @@ scan_file() {
     *.js|*.jsx|*.mjs|*.cjs|*.rs|*.go|*.tf|*.service|\
     Dockerfile|*/Dockerfile|Dockerfile.*|*/Dockerfile.*|\
     Makefile|*/Makefile|*.mk|bin/*|*/bin/*|scripts/*|*/scripts/*)
-      if [[ "$kind" == untracked ]]; then
-        if grep -aEq "$python_command" "$absolute"; then
-          printf 'PYTHON_INVOCATION  %s (new file)\n' "$file"
+      # Cheap prefilter: most changed files have no Python references.
+      if grep -aEq "$python_command" "$absolute"; then
+        if [[ "$kind" == untracked ]]; then
+          if grep -aE "$python_command" "$absolute" | has_interpreter_reference; then
+            printf 'PYTHON_INVOCATION  %s (new file)\n' "$file"
+            ((entry_count+=1))
+          fi
+        elif added_lines "$file" | has_interpreter_reference; then
+          printf 'PYTHON_INVOCATION  %s (added invocation)\n' "$file"
           ((entry_count+=1))
         fi
-      elif added_lines "$file" | grep -Eq "$python_command"; then
-        printf 'PYTHON_INVOCATION  %s (added invocation)\n' "$file"
-        ((entry_count+=1))
       fi
       ;;
   esac
