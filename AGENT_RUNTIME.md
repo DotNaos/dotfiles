@@ -20,6 +20,14 @@ dispatches, and the last-call-to-final-report window. The remaining time is
 **outside tools**. It can include generation, reasoning, scheduling and context
 handling; timestamps alone do not separate those components.
 
+For a finer breakdown, group each gap by the stages on either side: identity
+setup, host guides and recall, preflight, report preparation, report verification,
+and final completion. These are **phase contexts**, not proof of time spent in
+the named activity. Report startup separately and do not add time to first token
+again if it is already inside that window. Provider response-creation timestamps
+and token counts may add observational sub-boundaries; they do not independently
+measure queueing, scheduling or inference time. State when those fields are absent.
+
 Export only durations, counts, validated statuses and tool names. Keep source
 inspection local to the authorized installation. Do not copy raw session logs,
 conversation or reasoning text, tool arguments, outputs, live configuration,
@@ -42,6 +50,24 @@ connection details or credentials into reports or external telemetry.
 6. Reuse a reviewed recipe and compact report template for repeated fixed checks
    when available. Revalidate current inputs, guides, schemas, identity and
    authorization before executing it; prepared code never substitutes for them.
+7. Reduce setup dispatches without removing setup decisions: read the identity
+   skill and its permitted inventory together, then validate and complete the
+   selector/rename workflow in order. Collect independent local context, memory
+   guide and host discovery only after identity setup. Once those results are
+   read, combine independent host guides, applicable schemas and narrow recall.
+   Retain the inventory in orchestration context instead of repeatedly listing it
+   after a truncated display. Identify the current task through supported metadata,
+   follow real pagination, and preserve best-effort identity fallback behavior.
+   Emit each required guide once in a complete representation, with a sufficient
+   bounded output budget; read missing portions if output was truncated.
+8. Let a fixed workflow publish and immediately verify compact reports inside the
+   same awaited orchestration. Verify the canonical task-owned directory and use
+   exclusive no-follow creation for new files. Refuse occupied slots, verify
+   saved bytes and outcomes, and surface failures without overwriting or replaying
+   a partial publication. Do not spend an extra model round repeating that check.
+9. Once prerequisites have been read and verified, set the recipe inputs and run
+   it in the same awaited call. A dispatch that only stores already-decided inputs
+   adds a handoff without adding evidence. Keep required decision boundaries.
 
 Keep model settings and safety handling unchanged for an initial comparison.
 Changing those settings requires a separate decision and makes the original
