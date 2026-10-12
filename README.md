@@ -88,6 +88,18 @@ but must not redefine a key from an earlier layer; conflicting keys stop the
 render instead of producing an ambiguous config. Global `AGENTS.md` guidance is
 managed only from the base layer.
 
+For personal Remote Space work, this shared guidance makes the configured
+`remote_space_native` tools the default for every agent, including commands and
+file writes. Supported reads use its dedicated tools; general operations use
+`host_call`. Existing authorization and safety checks still apply. Missing native
+tools require an explicit availability report and a normal reload or fresh chat;
+an independently permitted hosted connection remains an explicit fallback.
+The separate `remote_space_read` connection cannot run commands or writes.
+Only these server/tool names are portable: connection details remain in the
+protected local configuration described below. Existing chats may retain old
+guidance or tool catalogs until normally reloaded; fresh chats receive the new
+default. Work installations must keep their separate connection boundaries.
+
 The global Environment Awareness rule establishes the local execution context
 and requires reading a remote host's versioned `environment_instructions` through
 its configured MCP connection before first operational use. The host maintains
