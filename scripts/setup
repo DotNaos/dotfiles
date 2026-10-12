@@ -6,6 +6,7 @@ DRY_RUN=0
 
 # shellcheck source=scripts/lib/context.sh
 source "$ROOT_DIR/scripts/lib/context.sh"
+source "$ROOT_DIR/scripts/lib/codex-cli.sh"
 
 usage() {
   cat <<'USAGE'
@@ -33,6 +34,7 @@ check_prerequisites() {
   done
 
   if [[ "${#missing[@]}" -eq 0 ]]; then
+    dotfiles_codex_cli >/dev/null || return 1
     log "Configuration prerequisites are available."
     return 0
   fi

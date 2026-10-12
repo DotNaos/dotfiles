@@ -139,7 +139,20 @@ render_managed_configs() {
   local render_script="$ROOT_DIR/scripts/render-configs"
   local render_args=("--home" "$TARGET_HOME" "--render-root" "$(rendered_config_root)")
 
-  [[ -x "$render_script" ]] || return 0
+  if [[ ! -x "$render_script" ]]; then
+    log "The configuration renderer is unavailable; no links were changed."
+    return 1
+  fi
+
+  if [[ "$DRY_RUN" -ne 1 ]]; then
+    source "$ROOT_DIR/scripts/lib/codex-cli.sh"
+    CODEX_CLI="$(dotfiles_codex_cli)"
+    CODEX_CHECK_ARGS=(render-codex --repo "$ROOT_DIR" --home "$TARGET_HOME"
+      --render-root "$(rendered_config_root)" --platform "$DOTFILES_PLATFORM"
+      --role "$DOTFILES_ROLE" --mode "$DOTFILES_MODE" --shell "$DOTFILES_SHELL"
+      --fingerprint-live)
+    CODEX_INPUT_BEFORE="$("$CODEX_CLI" "${CODEX_CHECK_ARGS[@]}")"
+  fi
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
     render_args=("--dry-run" "${render_args[@]}")
@@ -209,6 +222,14 @@ link_rendered_codex_files() {
       continue
     fi
 
+    if [[ "$item" == "config.toml" && "$DRY_RUN" -ne 1 ]]; then
+      local input_now
+      input_now="$("$CODEX_CLI" "${CODEX_CHECK_ARGS[@]}")"
+      if [[ "$input_now" != "$CODEX_INPUT_BEFORE" ]]; then
+        log "Codex input changed before linking; retry after the client finishes saving."
+        return 1
+      fi
+    fi
     link_source_path "$source_path" "$target_path" ".codex/$item"
   done
 }

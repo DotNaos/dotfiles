@@ -13,8 +13,12 @@ packages, use `sudo`, change `/etc`, or run system hooks. Systems own machine
 and package provisioning.
 
 ```bash
-./dotfiles/setup --config-only
+(cd ~/dotfiles/tools/dotfiles && go build -o dotfiles ./cmd/dotfiles)
+~/dotfiles/setup --config-only
 ```
+
+Go must already be provided by the system. Rebuild the CLI after updating the
+checkout; setup checks that the selected CLI supports configuration preservation.
 
 `./setup --config-only` is the stable entry point for system automation. The
 default `./setup` is also config-only for compatibility. Add `--dry-run` to
@@ -110,9 +114,40 @@ remain local and unversioned.
 To inspect or apply only the Codex files:
 
 ```bash
+# Build the existing Go CLI after a clone or an update.
+(cd tools/dotfiles && go build -o dotfiles ./cmd/dotfiles)
 ./scripts/link-home --only codex --dry-run
 ./scripts/link-home --only codex
 ```
+
+Rendering requires this CLI build (or an up-to-date installed `dotfiles` CLI).
+`DOTFILES_CLI` can select an explicit binary. Setup never installs or downloads
+the CLI automatically.
+
+Settings added or changed by Codex are preserved outside this repository in
+`~/.config/dotfiles/codex/<platform>/<role>.local.toml`. This private file has
+owner-only permissions, as does the rendered configuration. Keep actual MCP
+commands, addresses, arguments and credentials out of the public source layers.
+No connection details are logged by the preservation step.
+
+On the first rebuild, existing settings that differ from the current source
+defaults are imported once. Without previous history, an old default and a
+deliberate edit cannot be distinguished. Later rebuilds use local hashes to
+recognize client edits: unchanged settings follow updated source defaults;
+local additions, changes and deletions survive. Arrays are preserved together.
+The reserved `_dotfiles_codex` table records deleted paths in the private file
+and is omitted from Codex's configuration. Removing a deletion record restores
+the corresponding default.
+
+Private settings are scoped by platform and role. Switching roles does not
+import the previous role's live settings. A malformed input, unsafe symlink or
+detected concurrent edit stops rendering before replacing the working config.
+`--dry-run` validates without creating or updating files. The local
+`last-render.json` stores context and hashes rather than setting values.
+Simultaneous renders fail safely so they can be retried. If publishing is
+interrupted, a protected `.publish-pending` marker blocks further rendering
+until local recovery has checked the private settings, output and history;
+do not clear this marker without reviewing or restoring those files.
 
 ## Zsh layout
 

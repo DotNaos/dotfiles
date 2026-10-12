@@ -39,6 +39,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newStatusCommand(opts))
 	cmd.AddCommand(newFetchCommand(opts))
 	cmd.AddCommand(newUpdateCommand(opts))
+	cmd.AddCommand(newRenderCodexCommand(opts))
 	cmd.AddCommand(newCompletionCommand(cmd))
 	cmd.SetHelpCommand(&cobra.Command{Hidden: true})
 
