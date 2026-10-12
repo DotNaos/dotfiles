@@ -189,6 +189,26 @@ Notes:
   its project and config; `withsecrets` always selects local development.
 - `env-load` remains a generic, explicit project env-file loader.
 
+## Local Python growth audit
+
+Use the optional, read-only Git worktree check before committing project changes:
+
+```bash
+bash ~/dotfiles/scripts/check-python-growth.sh /path/to/repository
+bash ~/dotfiles/scripts/check-python-growth.sh --base origin/main /path/to/repository
+```
+
+Without `--base`, it compares against the current branch point with local
+`origin/main` (or `main`/`master`/`trunk`); it never fetches. `--base REF`
+compares with that exact Git revision, including commits made on the branch.
+It inspects staged, unstaged, and non-ignored untracked source/config files,
+reporting new Python files/manifests, added interpreter references, and edits
+to legacy Python for manual review. Approved Python scopes must be evaluated
+by the user; the scan is heuristic and not a comprehensive language detector.
+
+Findings return exit code `0` and are **not** a CI or pre-commit gate.
+Invalid repository/ref or other Git errors return `2`. No project files,
+hooks, CI configuration, or interpreter installations are changed.
 ## Smoke checks
 
 Run after changes:
