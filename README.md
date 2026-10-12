@@ -100,6 +100,14 @@ protected local configuration described below. Existing chats may retain old
 guidance or tool catalogs until normally reloaded; fresh chats receive the new
 default. Work installations must keep their separate connection boundaries.
 
+The shared feedback-loop rules also reduce avoidable waits between calls: batch
+independent inspections, reuse complete guides until their refresh conditions
+apply, and group predictable dependent steps with per-step checks where the
+existing client supports orchestration. [AGENT_RUNTIME.md](AGENT_RUNTIME.md)
+describes how to measure complete task duration without exporting private
+conversation content or connection details. This is portable agent guidance,
+not a new background telemetry service or a change to model settings.
+
 The global Environment Awareness rule establishes the local execution context
 and requires reading a remote host's versioned `environment_instructions` through
 its configured MCP connection before first operational use. The host maintains
