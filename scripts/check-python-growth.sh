@@ -92,7 +92,10 @@ is_new_file() {
     ! git -C "$root" cat-file -e "$baseline:$1" 2>/dev/null
 }
 has_interpreter_reference() {
-  grep -Ev '^[[:space:]]*(#|//|python_command=)' | grep -Eq "$python_command"
+  awk -v pattern="$python_command" '
+    /^[[:space:]]*(#|\/\/|python_command=)/ {next}
+    $0 ~ pattern {found=1}
+    END {exit !found}'
 }
 
 new_count=0
@@ -150,7 +153,7 @@ scan_file() {
       # Cheap prefilter: most changed files have no Python references.
       if grep -aEq "$python_command" "$absolute"; then
         if [[ "$kind" == untracked ]]; then
-          if grep -aE "$python_command" "$absolute" | has_interpreter_reference; then
+          if has_interpreter_reference < "$absolute"; then
             printf 'PYTHON_INVOCATION  %s (new file)\n' "$file"
             ((entry_count+=1))
           fi
