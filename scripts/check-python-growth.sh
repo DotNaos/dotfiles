@@ -75,7 +75,16 @@ fi
 temporary=$(mktemp -d)
 trap 'rm -rf "$temporary"' EXIT
 git -C "$root" diff --no-ext-diff --name-only --diff-filter=ACMR -z "$baseline" -- > "$temporary/tracked"
-git -C "$root" ls-files --others --exclude-standard -z > "$temporary/untracked"
+# Restrict untracked enumeration to source/config candidates. Large worktrees can
+# contain hundreds of thousands of build artifacts that are not relevant here.
+git -C "$root" ls-files --others --exclude-standard -z -- \
+  '*.py' '*.pyw' '*.pyi' '*.py.template' '*.ipynb' \
+  '*.sh' '*.bash' '*.zsh' '*.fish' '*.yml' '*.yaml' '*.json' \
+  '*.toml' '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' \
+  '*.rs' '*.go' '*.tf' '*.service' '*.mk' '*Dockerfile*' '*Makefile*' \
+  'requirements*.txt' 'Pipfile*' 'poetry.lock' 'uv.lock' \
+  '.python-version' 'tox.ini' 'bin/*' '*/bin/*' 'scripts/*' '*/scripts/*' \
+  > "$temporary/untracked"
 
 # Detect only newly added lines, not pre-existing interpreter commands.
 python_command='(^|[^[:alnum:]_.-])(python([0-9]+([.][0-9]+)?)?|pip3?|pytest|poetry)([[:space:];|<>()]|$)|(^|[[:space:];])uv[[:space:]]+(run|sync|pip)([[:space:]]|$)'
