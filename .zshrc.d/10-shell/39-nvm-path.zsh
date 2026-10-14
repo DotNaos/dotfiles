@@ -1,3 +1,25 @@
+# Resolving in a child keeps the parent's NVM function undefined, so the OMZ
+# plugin still installs its own lazy loader, completion and optional hooks.
+dotfiles_resolve_nvm_path() {
+  local selected
+  selected="$(
+    source "$NVM_DIR/nvm.sh" >/dev/null
+    [[ "$(whence -p node 2>/dev/null)" == "${NVM_BIN:-}/node" ]] || exit 0
+    print -r -- "$NVM_BIN"
+  )" || return 0
+  dotfiles_apply_nvm_path "$selected"
+}
+
+dotfiles_apply_nvm_path() {
+  local selected="$1"
+  [[ "$selected" == "$NVM_DIR"/versions/node/*/bin && -x "$selected/node" ]] || return 0
+  path=("$selected" "${(@)path:#$NVM_DIR/versions/node/*/bin}")
+  export PATH NVM_BIN="$selected" NVM_INC="${selected:h}/include/node"
+  if [[ -n ${MANPATH:-} && ":$MANPATH:" != *":${selected:h}/share/man:"* ]]; then
+    export MANPATH="${selected:h}/share/man:$MANPATH"
+  fi
+}
+
 # Preserve all default-version Node commands while deferring NVM's shell setup.
 # Resolve through NVM itself on a cache miss; do not reimplement version aliases.
 dotfiles_prepare_nvm_path() {
@@ -14,16 +36,16 @@ dotfiles_prepare_nvm_path() {
   # Without a default alias, NVM can select a version from the current directory.
   # Keep that behavior uncached rather than caching a directory-specific choice.
   if [[ ! -r "$NVM_DIR/alias/default" ]]; then
-    source "$NVM_DIR/nvm.sh"
+    dotfiles_resolve_nvm_path
     return 0
   fi
 
-  zmodload -F zsh/stat b:zstat || { source "$NVM_DIR/nvm.sh"; return 0; }
+  zmodload -F zsh/stat b:zstat || { dotfiles_resolve_nvm_path; return 0; }
   local nvm_current_node="$(whence -p node 2>/dev/null)"
   local nvm_file nvm_key="nvm-path-v1 ${(q)NVM_DIR} ${(q)nvm_current_node}"
   local -A nvm_stat
   for nvm_file in "$NVM_DIR/nvm.sh" "$NVM_DIR"/alias/**/*(N-.); do
-    zstat -H nvm_stat "$nvm_file" 2>/dev/null || { source "$NVM_DIR/nvm.sh"; return 0; }
+    zstat -H nvm_stat "$nvm_file" 2>/dev/null || { dotfiles_resolve_nvm_path; return 0; }
     nvm_key+=" ${(q)nvm_file}:$nvm_stat[device]:$nvm_stat[inode]:$nvm_stat[mtime]:$nvm_stat[ctime]:$nvm_stat[size]"
     [[ "$nvm_file" == "$NVM_DIR"/alias/* ]] && nvm_key+=" ${(q)$(< "$nvm_file")}"
   done
@@ -36,17 +58,13 @@ dotfiles_prepare_nvm_path() {
   if [[ -f "$nvm_cache" && ! -L "$nvm_cache" ]]; then
     { IFS= read -r nvm_header; IFS= read -r nvm_selected; } < "$nvm_cache"
     if [[ "$nvm_header" == "$nvm_key" && "$nvm_selected" == "$NVM_DIR"/versions/node/*/bin && -x "$nvm_selected/node" ]]; then
-      path=("$nvm_selected" "${(@)path:#$NVM_DIR/versions/node/*/bin}")
-      export PATH NVM_BIN="$nvm_selected" NVM_INC="${nvm_selected:h}/include/node"
-      if [[ -n ${MANPATH:-} && ":$MANPATH:" != *":${nvm_selected:h}/share/man:"* ]]; then
-        export MANPATH="${nvm_selected:h}/share/man:$MANPATH"
-      fi
+      dotfiles_apply_nvm_path "$nvm_selected"
       return 0
     fi
   fi
 
   # First use or a changed alias/version: let the existing NVM choose normally.
-  source "$NVM_DIR/nvm.sh"
+  dotfiles_resolve_nvm_path
   nvm_selected="${NVM_BIN:-}"
   [[ "$(whence -p node 2>/dev/null)" == "$nvm_selected/node" ]] || return 0
   [[ "$nvm_selected" == "$NVM_DIR"/versions/node/*/bin && -x "$nvm_selected/node" ]] || return 0

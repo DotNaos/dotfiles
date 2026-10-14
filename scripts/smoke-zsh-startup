@@ -109,6 +109,7 @@ for version in v1 v2; do
 done
 print v1 > "$TEST_DIR/nvm/alias/default"
 cat > "$TEST_DIR/nvm/nvm.sh" <<'NVM'
+nvm() { return 0; }
 print loaded >> "$NVM_DIR/provider-calls"
 export NVM_BIN="$NVM_DIR/versions/node/$(< "$NVM_DIR/alias/default")/bin"
 export PATH="$NVM_BIN:$PATH"
@@ -118,6 +119,7 @@ NVM
   source "$ROOT_DIR/.zshrc.d/10-shell/39-nvm-path.zsh"
   original_path=$PATH
   dotfiles_prepare_nvm_path
+  (( ! $+functions[nvm] )) || fail 'NVM resolver bypassed plugin setup'
   [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v1/bin/nvm-global-fixture" ]] || fail 'NVM global CLI hidden'
   PATH=$original_path
   dotfiles_prepare_nvm_path
@@ -125,6 +127,7 @@ NVM
   print v2 > "$NVM_DIR/alias/default"
   PATH=$original_path
   dotfiles_prepare_nvm_path
+  (( ! $+functions[nvm] )) || fail 'NVM resolver bypassed plugin setup'
   [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v2/bin/nvm-global-fixture" ]] || fail 'NVM alias cache stale'
 )
 print 'zsh startup smoke passed'
