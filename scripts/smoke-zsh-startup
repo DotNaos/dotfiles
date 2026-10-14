@@ -1,0 +1,78 @@
+#!/usr/bin/env zsh
+# Isolated behavior checks; no package installation, builds or network access.
+emulate -LR zsh
+setopt errexit nounset pipefail
+ROOT_DIR="${0:A:h:h}"
+TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-zsh.XXXXXX")"
+trap 'command rm -rf -- "$TEST_DIR"' EXIT
+
+fail() { print -u2 -- "$*"; exit 1; }
+has() { command -v "$1" >/dev/null 2>&1; }
+export DOTFILES_TEST_CALLS="$TEST_DIR/calls"
+export DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/cache"
+mkdir "$TEST_DIR/bin"
+path=("$TEST_DIR/bin" $path)
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=%s\n' "$1"
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+source "$ROOT_DIR/.zshrc.d/10-shell/38-completion-cache.zsh"
+
+dotfiles_load_generated_completion completion-fixture completion-fixture first
+[[ "$DOTFILES_TEST_COMPLETION" == first ]] || fail 'cold completion failed'
+dotfiles_load_generated_completion completion-fixture completion-fixture first
+[[ $(< "$DOTFILES_TEST_CALLS") == called ]] || fail 'warm cache ran generator'
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == second ]] || fail 'argument change did not invalidate cache'
+[[ ${#${(f)"$(< "$DOTFILES_TEST_CALLS")"}} == 2 ]] || fail 'argument regeneration count'
+
+# Replace the executable and verify failed output cannot replace a good cache.
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=broken\n'
+exit 1
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+unset DOTFILES_TEST_COMPLETION
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == second ]] || fail 'failed generator damaged existing cache'
+
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=replaced\n'
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == replaced ]] || fail 'executable replacement did not invalidate cache'
+
+# A cache path occupied by a file must produce no output or partial state.
+print occupied > "$TEST_DIR/unavailable"
+DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/unavailable"
+unset DOTFILES_TEST_COMPLETION
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ ! -v DOTFILES_TEST_COMPLETION ]] || fail 'unwritable cache changed completion state'
+
+# Every zsh can bootstrap from a clean PATH; repeated sourcing is idempotent.
+mkdir "$TEST_DIR/zdot"
+ln -s "$ROOT_DIR/.zshenv" "$TEST_DIR/zdot/.zshenv"
+ln -s "$ROOT_DIR/.zshrc" "$TEST_DIR/zdot/.zshrc"
+ln -s "$ROOT_DIR/.zprofile" "$TEST_DIR/zdot/.zprofile"
+ln -s "$ROOT_DIR/.zshrc.d" "$TEST_DIR/zdot/.zshrc.d"
+ZDOTDIR="$TEST_DIR/zdot" DOTFILES_ROOT="$ROOT_DIR" \
+  OP_SERVICE_ACCOUNT_TOKEN=synthetic DOPPLER_TOKEN=synthetic \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin zsh -lc '
+    [[ ! -v OP_SERVICE_ACCOUNT_TOKEN && ! -v DOPPLER_TOKEN ]] || exit 1
+    (( $+functions[safe_source] )) || exit 1
+    before=$PATH
+    source "$ZDOTDIR/.zshenv"
+    source "$ZDOTDIR/.zshrc"
+    [[ "$before" == "$PATH" ]] || exit 1
+    unique=("${(@u)path}")
+    [[ ${#path} -eq ${#unique} ]] || exit 1
+    [[ "$DOTFILES_SHELL" == zsh ]] || exit 1
+  '
+print 'zsh startup smoke passed'

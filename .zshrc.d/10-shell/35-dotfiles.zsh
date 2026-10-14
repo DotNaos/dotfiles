@@ -62,5 +62,4 @@ dotfiles_daily_update_notice() {
   fi
 }
 
-ensure_dotfiles_cli_installed
-dotfiles_daily_update_notice
+# Maintenance is explicit: ensure_dotfiles_cli_installed / dotfiles_daily_update_notice.

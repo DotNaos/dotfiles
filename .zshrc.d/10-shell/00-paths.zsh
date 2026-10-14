@@ -4,15 +4,30 @@ if [[ -z "${PATH:-}" ]]; then
   export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 fi
 
-if [[ -f "/opt/homebrew/bin/brew" ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -f "/usr/local/bin/brew" ]]; then
-  eval "$(/usr/local/bin/brew shellenv)"
-elif [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
-  eval "$($HOME/.linuxbrew/bin/brew shellenv)"
-fi
+# Homebrew's stable environment without starting brew on every shell launch.
+# Keep the prefix selection used by this configuration on macOS and Linux.
+for __brew_prefix in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/.linuxbrew"; do
+  [[ -x "$__brew_prefix/bin/brew" ]] || continue
+  export HOMEBREW_PREFIX="$__brew_prefix"
+  export HOMEBREW_CELLAR="$__brew_prefix/Cellar"
+  if [[ "$__brew_prefix" == /usr/local ]]; then
+    export HOMEBREW_REPOSITORY="$__brew_prefix/Homebrew"
+  else
+    export HOMEBREW_REPOSITORY="$__brew_prefix"
+  fi
+  typeset -gU path fpath
+  path=("$__brew_prefix/bin" "$__brew_prefix/sbin" $path)
+  fpath=("$__brew_prefix/share/zsh/site-functions" $fpath)
+  export PATH FPATH
+  if [[ -n ${MANPATH:-} ]]; then
+    export MANPATH=":${${MANPATH##:}%%:}"
+  fi
+  if [[ ":${INFOPATH:-}:" != *":$__brew_prefix/share/info:"* ]]; then
+    export INFOPATH="$__brew_prefix/share/info:${INFOPATH:-}"
+  fi
+  break
+done
+unset __brew_prefix
 
 append_path_once "/usr/bin"
 append_path_once "/bin"
@@ -53,5 +68,8 @@ unset __nvm_node_bin
 FNM_PATH="$HOME/.local/share/fnm"
 if [[ -d "$FNM_PATH" ]]; then
   append_path_once "$FNM_PATH"
-  eval "$(fnm env)"
+  if [[ -z ${__DOTFILES_FNM_READY:-} ]] && has fnm; then
+    typeset -g __DOTFILES_FNM_READY=1
+    eval "$(fnm env)"
+  fi
 fi

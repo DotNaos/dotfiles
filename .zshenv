@@ -1,4 +1,7 @@
 # Shared environment bootstrap for every zsh process.
+# This guard is deliberately not exported: every child shell initializes itself.
+[[ -n ${__DOTFILES_ENV_READY:-} ]] && return 0
+typeset -g __DOTFILES_ENV_READY=1
 
 typeset -g DOTFILES_ROOT="${DOTFILES_ROOT:-${${(%):-%N}:A:h}}"
 
@@ -16,5 +19,3 @@ safe_source "${ZDOTDIR:-$HOME}/.zshrc.d/10-shell/00-paths.zsh"
 # loads a long-lived machine credential into the environment.
 unset OP_SERVICE_ACCOUNT_TOKEN
 unset DOPPLER_TOKEN
-
-unfunction safe_source

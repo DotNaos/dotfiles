@@ -15,5 +15,5 @@ if [[ "$TERM_PROGRAM" == "kiro" ]] && has kiro; then
 fi
 
 if has fzf; then
-  eval "$(fzf --zsh)"
+  dotfiles_load_generated_completion fzf fzf --zsh
 fi

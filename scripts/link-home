@@ -19,6 +19,7 @@ LINK_ITEMS=(
   ".zsh"
   ".zsh_aliases"
   ".zshenv"
+  ".zprofile"
   ".zshrc"
   ".zshrc.d"
   ".zshrc_functions"
