@@ -14,12 +14,7 @@ dotfiles_zinit_snippet OMZP::kubectx
 dotfiles_zinit_snippet OMZP::docker
 dotfiles_zinit_snippet OMZP::docker-compose
 dotfiles_zinit_snippet OMZP::brew
-# Keep the selected Node version behavior, but initialize NVM on first use.
-# Opt-in automatic version switching keeps the provider's own startup setup.
-if ! zstyle -t ':omz:plugins:nvm' autoload; then
-  dotfiles_prepare_nvm_path
-  zstyle ':omz:plugins:nvm' lazy yes
-fi
+# Let NVM own version selection, command priority, completion and hooks.
 dotfiles_zinit_snippet OMZP::nvm
 dotfiles_zinit_snippet OMZP::colorize
 dotfiles_zinit_snippet OMZP::python

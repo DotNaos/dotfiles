@@ -32,7 +32,7 @@ dotfiles_init_completions() {
   done
   unset _toolkit_completion
 
-  dotfiles_load_generated_completion devbox env COMPLETE=zsh devbox
+  dotfiles_load_uncached_completion devbox env COMPLETE=zsh devbox
   dotfiles_load_generated_completion jj env COMPLETE=zsh jj
   dotfiles_load_generated_completion moodle moodle completion zsh
   dotfiles_load_generated_completion codex codex completion zsh

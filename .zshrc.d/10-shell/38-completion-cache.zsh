@@ -40,3 +40,15 @@ dotfiles_load_generated_completion() {
   fi
   return 0
 }
+
+# Stable dispatchers can select another implementation without changing their
+# own file metadata. Let those providers own any caching and build selection.
+dotfiles_load_uncached_completion() {
+  local cmd="$1"
+  shift
+  has "$cmd" || return 0
+  local generated
+  generated="$("$@" 2>/dev/null)" || return 0
+  [[ -n "$generated" ]] && source /dev/stdin <<< "$generated"
+  return 0
+}

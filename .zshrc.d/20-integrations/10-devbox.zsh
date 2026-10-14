@@ -1,3 +1,3 @@
-# The installed site-functions stub runs Devbox and warms its cache on every
-# source. Generate its completion through our cache instead.
+# The installed stub also starts cache warming on every source. Read completion
+# from the current Devbox implementation directly, leaving caching to Devbox.
 # Registration happens after compinit in dotfiles_init_completions.

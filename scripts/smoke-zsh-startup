@@ -59,6 +59,20 @@ command mv "$TEST_DIR/bin/atomic-replacement" "$TEST_DIR/bin/atomic-fixture"
 dotfiles_load_generated_completion atomic-fixture atomic-fixture
 [[ "$DOTFILES_TEST_ATOMIC" == after_ ]] || fail 'same-size atomic replacement was stale'
 
+# A stable launcher may switch its implementation without changing metadata.
+# Uncached generation must always reflect the currently selected implementation.
+export DOTFILES_TEST_ACTIVE="$TEST_DIR/current-completion"
+cat > "$TEST_DIR/bin/dispatcher-fixture" <<'SH'
+#!/bin/sh
+cat "$DOTFILES_TEST_ACTIVE"
+SH
+chmod +x "$TEST_DIR/bin/dispatcher-fixture"
+print 'typeset -g DOTFILES_TEST_DISPATCH=first' > "$DOTFILES_TEST_ACTIVE"
+dotfiles_load_uncached_completion dispatcher-fixture dispatcher-fixture
+print 'typeset -g DOTFILES_TEST_DISPATCH=second' > "$DOTFILES_TEST_ACTIVE"
+dotfiles_load_uncached_completion dispatcher-fixture dispatcher-fixture
+[[ "$DOTFILES_TEST_DISPATCH" == second ]] || fail 'dispatcher completion was stale'
+
 # A cache path occupied by a file must produce no output or partial state.
 print occupied > "$TEST_DIR/unavailable"
 DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/unavailable"
@@ -98,38 +112,6 @@ chmod +x "$TEST_DIR/selected/bin/node"
   [[ "$path[1]" == "$FNM_MULTISHELL_PATH/bin" ]] || fail 'fnm selection displaced'
 )
 
-# Test the NVM cache boundary with a provider fixture; aliases are resolved by
-# the provider on a miss and arbitrary installed commands remain on PATH.
-mkdir -p "$TEST_DIR/nvm/alias" "$TEST_DIR/nvm/versions/node/v1/bin" "$TEST_DIR/nvm/versions/node/v2/bin"
-for version in v1 v2; do
-  for cli in node nvm-global-fixture; do
-    printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/nvm/versions/node/$version/bin/$cli"
-    chmod +x "$TEST_DIR/nvm/versions/node/$version/bin/$cli"
-  done
-done
-print v1 > "$TEST_DIR/nvm/alias/default"
-cat > "$TEST_DIR/nvm/nvm.sh" <<'NVM'
-nvm() { return 0; }
-print loaded >> "$NVM_DIR/provider-calls"
-export NVM_BIN="$NVM_DIR/versions/node/$(< "$NVM_DIR/alias/default")/bin"
-export PATH="$NVM_BIN:$PATH"
-NVM
-(
-  export NVM_DIR="$TEST_DIR/nvm" XDG_CACHE_HOME="$TEST_DIR/nvm-cache"
-  source "$ROOT_DIR/.zshrc.d/10-shell/39-nvm-path.zsh"
-  original_path=$PATH
-  dotfiles_prepare_nvm_path
-  (( ! $+functions[nvm] )) || fail 'NVM resolver bypassed plugin setup'
-  [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v1/bin/nvm-global-fixture" ]] || fail 'NVM global CLI hidden'
-  PATH=$original_path
-  dotfiles_prepare_nvm_path
-  [[ "$(< "$NVM_DIR/provider-calls")" == loaded ]] || fail 'warm NVM cache loaded provider'
-  print v2 > "$NVM_DIR/alias/default"
-  PATH=$original_path
-  dotfiles_prepare_nvm_path
-  (( ! $+functions[nvm] )) || fail 'NVM resolver bypassed plugin setup'
-  [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v2/bin/nvm-global-fixture" ]] || fail 'NVM alias cache stale'
-)
 # A manual .zshrc source must bootstrap even without a linked .zshenv.
 mkdir -p "$TEST_DIR/manual"
 ln -s "$ROOT_DIR/.zshrc.d" "$TEST_DIR/manual/.zshrc.d"
@@ -140,16 +122,6 @@ ZDOTDIR="$TEST_DIR/manual" DOTFILES_ROOT="$ROOT_DIR" XDG_DATA_HOME="$TEST_DIR/no
     [[ "$DOTFILES_SHELL" == zsh && -n "$DOTFILES_PLATFORM" ]] || exit 1
   ' manual "$ROOT_DIR"
 
-# The Homebrew provider carries a separate path for its completion script.
-mkdir -p "$TEST_DIR/brew/opt/nvm" "$TEST_DIR/empty-home"
-print 'nvm() { return 0; }' > "$TEST_DIR/brew/opt/nvm/nvm.sh"
-env HOME="$TEST_DIR/empty-home" XDG_CONFIG_HOME="$TEST_DIR/empty-home/.config" \
-  HOMEBREW_PREFIX="$TEST_DIR/brew" zsh -fc '
-    unset NVM_DIR NVM_HOMEBREW
-    source "$1/.zshrc.d/10-shell/39-nvm-path.zsh"
-    dotfiles_prepare_nvm_path
-    [[ "$NVM_HOMEBREW" == "$HOMEBREW_PREFIX/opt/nvm" ]] || exit 1
-  ' homebrew "$ROOT_DIR"
 # When the real optional provider is installed, verify its opt-in project
 # switching setup, including the directory-change hook, without installing Node.
 actual_nvm="${NVM_DIR:-$HOME/.nvm}"
