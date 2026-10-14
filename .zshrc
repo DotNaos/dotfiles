@@ -1,7 +1,11 @@
 # Reuse the universal zsh bootstrap when `.zshrc` is sourced manually in an
 # already-running shell.
-if [[ -z ${__DOTFILES_ENV_READY:-} && -r "${ZDOTDIR:-$HOME}/.zshenv" ]]; then
-  source "${ZDOTDIR:-$HOME}/.zshenv"
+if [[ -z ${__DOTFILES_ENV_READY:-} ]]; then
+  __dotfiles_env="${ZDOTDIR:-$HOME}/.zshenv"
+  # Manual startup can provide modules without a linked .zshenv.
+  [[ -r "$__dotfiles_env" ]] || __dotfiles_env="${${(%):-%N}:A:h}/.zshenv"
+  [[ -r "$__dotfiles_env" ]] && source "$__dotfiles_env"
+  unset __dotfiles_env
 fi
 
 # Non-interactive shells should not load prompt tooling or other interactive
@@ -48,7 +52,9 @@ if [[ -d "$ZSHRC_D" ]]; then
   for __dotfiles_module in "$ZSHRC_D"/**/*.zsh(N); do
     # Core and paths were already loaded by .zshenv.
     case "$__dotfiles_module" in
-      */00-core/00-core.zsh|*/10-shell/00-paths.zsh) continue ;;
+      */00-core/00-core.zsh|*/10-shell/00-paths.zsh)
+        [[ -n ${__DOTFILES_ENV_READY:-} ]] && continue
+        ;;
     esac
     source "$__dotfiles_module"
   done

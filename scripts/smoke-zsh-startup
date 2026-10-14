@@ -130,4 +130,44 @@ NVM
   (( ! $+functions[nvm] )) || fail 'NVM resolver bypassed plugin setup'
   [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v2/bin/nvm-global-fixture" ]] || fail 'NVM alias cache stale'
 )
+# A manual .zshrc source must bootstrap even without a linked .zshenv.
+mkdir -p "$TEST_DIR/manual"
+ln -s "$ROOT_DIR/.zshrc.d" "$TEST_DIR/manual/.zshrc.d"
+ZDOTDIR="$TEST_DIR/manual" DOTFILES_ROOT="$ROOT_DIR" XDG_DATA_HOME="$TEST_DIR/no-plugins" \
+  XDG_CACHE_HOME="$TEST_DIR/manual-cache" zsh -fic '
+    source "$1/.zshrc"
+    (( $+functions[has] && $+functions[safe_source] )) || exit 1
+    [[ "$DOTFILES_SHELL" == zsh && -n "$DOTFILES_PLATFORM" ]] || exit 1
+  ' manual "$ROOT_DIR"
+
+# The Homebrew provider carries a separate path for its completion script.
+mkdir -p "$TEST_DIR/brew/opt/nvm" "$TEST_DIR/empty-home"
+print 'nvm() { return 0; }' > "$TEST_DIR/brew/opt/nvm/nvm.sh"
+env HOME="$TEST_DIR/empty-home" XDG_CONFIG_HOME="$TEST_DIR/empty-home/.config" \
+  HOMEBREW_PREFIX="$TEST_DIR/brew" zsh -fc '
+    unset NVM_DIR NVM_HOMEBREW
+    source "$1/.zshrc.d/10-shell/39-nvm-path.zsh"
+    dotfiles_prepare_nvm_path
+    [[ "$NVM_HOMEBREW" == "$HOMEBREW_PREFIX/opt/nvm" ]] || exit 1
+  ' homebrew "$ROOT_DIR"
+# When the real optional provider is installed, verify its opt-in project
+# switching setup, including the directory-change hook, without installing Node.
+actual_nvm="${NVM_DIR:-$HOME/.nvm}"
+actual_versions=("$actual_nvm"/versions/node/*/bin/node(N))
+actual_plugin="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/snippets/OMZP::nvm/OMZP::nvm"
+if [[ -r "$actual_nvm/nvm.sh" && -r "$actual_plugin" && ${#actual_versions} -gt 0 ]]; then
+  mkdir "$TEST_DIR/autoload"
+  print -r -- "${actual_versions[1]:h:h:t}" > "$TEST_DIR/autoload/.nvmrc"
+  (
+    builtin cd "$TEST_DIR/autoload"
+    ZDOTDIR="$TEST_DIR/zdot" DOTFILES_ROOT="$ROOT_DIR" NVM_DIR="$actual_nvm" TERM=dumb \
+      zsh -fic '
+        source "$ZDOTDIR/.zshenv"
+        zstyle ":omz:plugins:nvm" autoload yes
+        source "$ZDOTDIR/.zshrc"
+        (( $+functions[load-nvmrc] && ${chpwd_functions[(Ie)load-nvmrc]} > 0 )) || exit 1
+        [[ "$NVM_BIN" == "$NVM_DIR/versions/node/$(< .nvmrc)/bin" ]] || exit 1
+      ' > "$TEST_DIR/autoload-proof.log" 2>&1
+  ) || fail 'real NVM automatic switching setup failed'
+fi
 print 'zsh startup smoke passed'

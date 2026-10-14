@@ -29,7 +29,8 @@ dotfiles_prepare_nvm_path() {
     elif [[ -d "${XDG_CONFIG_HOME:-$HOME/.config}/nvm" ]]; then
       export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
     elif [[ -d "${NVM_HOMEBREW:-${HOMEBREW_PREFIX:-}/opt/nvm}" ]]; then
-      export NVM_DIR="${NVM_HOMEBREW:-${HOMEBREW_PREFIX:-}/opt/nvm}"
+      export NVM_HOMEBREW="${NVM_HOMEBREW:-${HOMEBREW_PREFIX:-}/opt/nvm}"
+      export NVM_DIR="$NVM_HOMEBREW"
     fi
   fi
   [[ -n ${NVM_DIR:-} && -r "$NVM_DIR/nvm.sh" ]] || return 0

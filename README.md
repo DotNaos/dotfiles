@@ -179,6 +179,8 @@ do not clear this marker without reviewing or restoring those files.
   on the first Node-related command. On a cache miss, the existing NVM resolves
   the version normally. Alias, installed-version and incoming Node-path changes
   invalidate that cache; configurations without a default alias remain uncached.
+  Explicit automatic version switching (`:omz:plugins:nvm autoload`) keeps the
+  existing provider setup and its directory-change hook.
 - Startup never clones plugins, builds CLIs, or fetches Git updates. Missing plugins
   are skipped until explicitly installed with Zinit. Use
   `ensure_worktree_installed`, `ensure_dotfiles_cli_installed`, or
