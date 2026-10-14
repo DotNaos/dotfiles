@@ -1,13 +1,3 @@
-# Devbox CLI integration.
-
-DEVBOX_ZSH_COMPLETION="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions/_devbox"
-
-if [[ -r "$DEVBOX_ZSH_COMPLETION" ]]; then
-  if (( ! $+functions[compdef] )); then
-    autoload -Uz compinit
-    compinit
-  fi
-  source "$DEVBOX_ZSH_COMPLETION"
-fi
-
-unset DEVBOX_ZSH_COMPLETION
+# The installed stub also starts cache warming on every source. Read completion
+# from the current Devbox implementation directly, leaving caching to Devbox.
+# Registration happens after compinit in dotfiles_init_completions.

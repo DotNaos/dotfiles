@@ -26,7 +26,7 @@ ensure_worktree_installed() {
   (cd "$DOTFILES_WORKTREE_ROOT" && go build -o "$DOTFILES_WORKTREE_BIN" ./cmd/worktree) >/dev/null 2>&1 || return 0
 }
 
-ensure_worktree_installed
+# Build explicitly with ensure_worktree_installed when needed.
 
 # Allow `worktree switch <branch>` to change the current shell directory.
 # A standalone binary cannot `cd` the parent shell, so this wrapper evals

@@ -1,7 +1,11 @@
 # Reuse the universal zsh bootstrap when `.zshrc` is sourced manually in an
 # already-running shell.
-if [[ -f "$HOME/.zshenv" ]]; then
-  source "$HOME/.zshenv"
+if [[ -z ${__DOTFILES_ENV_READY:-} ]]; then
+  __dotfiles_env="${ZDOTDIR:-$HOME}/.zshenv"
+  # Manual startup can provide modules without a linked .zshenv.
+  [[ -r "$__dotfiles_env" ]] || __dotfiles_env="${${(%):-%N}:A:h}/.zshenv"
+  [[ -r "$__dotfiles_env" ]] && source "$__dotfiles_env"
+  unset __dotfiles_env
 fi
 
 # Non-interactive shells should not load prompt tooling or other interactive
@@ -11,20 +15,31 @@ if [[ ! -o interactive ]]; then
   return 0
 fi
 
-# Ensure Zinit exists
+# Re-sourcing configuration must not duplicate hooks, plugins or completion work.
+[[ -n ${__DOTFILES_RC_READY:-} ]] && return 0
+typeset -g __DOTFILES_RC_READY=1
+
+# Plugin installation is an explicit maintenance action, never startup work.
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-if [[ ! -d "${ZINIT_HOME}" ]]; then
-  echo "Zinit not found, installing..."
-  mkdir -p "$(dirname "$ZINIT_HOME")"
-  git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+if [[ -r "${ZINIT_HOME}/zinit.zsh" ]]; then
+  source "${ZINIT_HOME}/zinit.zsh"
+  DOTFILES_ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+  ZINIT[ZCOMPDUMP_PATH]="${DOTFILES_ZSH_CACHE_DIR}/.zcompdump-${HOST%%.*}-${ZSH_VERSION}"
 fi
 
-# Load Zinit
-source "${ZINIT_HOME}/zinit.zsh"
-
-DOTFILES_ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
-mkdir -p "$DOTFILES_ZSH_CACHE_DIR"
-ZINIT[ZCOMPDUMP_PATH]="${DOTFILES_ZSH_CACHE_DIR}/.zcompdump-${HOST%%.*}-${ZSH_VERSION}"
+# Only load previously installed plugins. Missing plugins can be installed with
+# the normal zinit commands explicitly; opening a terminal never downloads them.
+dotfiles_zinit_snippet() {
+  (( $+functions[zinit] )) || return 0
+  local snippet="$1"
+  [[ -r "${ZINIT[SNIPPETS_DIR]}/$snippet/$snippet" ]] || return 0
+  zinit snippet "$snippet"
+}
+dotfiles_zinit_light() {
+  (( $+functions[zinit] )) || return 0
+  [[ -d "${ZINIT[PLUGINS_DIR]}/${1//\//---}" ]] || return 0
+  zinit light "$1"
+}
 
 # Keep this file minimal (bootstrap/loader only).
 # Put all regular configuration in modules under ~/.zshrc.d/.
@@ -35,6 +50,12 @@ ZINIT[ZCOMPDUMP_PATH]="${DOTFILES_ZSH_CACHE_DIR}/.zcompdump-${HOST%%.*}-${ZSH_VE
 ZSHRC_D="${ZDOTDIR:-$HOME}/.zshrc.d"
 if [[ -d "$ZSHRC_D" ]]; then
   for __dotfiles_module in "$ZSHRC_D"/**/*.zsh(N); do
+    # Core and paths were already loaded by .zshenv.
+    case "$__dotfiles_module" in
+      */00-core/00-core.zsh|*/10-shell/00-paths.zsh)
+        [[ -n ${__DOTFILES_ENV_READY:-} ]] && continue
+        ;;
+    esac
     source "$__dotfiles_module"
   done
   unset __dotfiles_module

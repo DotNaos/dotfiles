@@ -172,7 +172,21 @@ do not clear this marker without reviewing or restoring those files.
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
-- `.zshrc` is now a thin loader.
+- `.zshrc` is a thin, idempotent loader; repeated sourcing does not duplicate hooks.
+- `.zprofile` reapplies PATH priority after the system login profile.
+- Homebrew paths use shell builtins. NVM keeps its existing provider-owned
+  initialization, preserving version selection, global commands and hooks.
+- Startup never clones plugins, builds CLIs, or fetches Git updates. Missing plugins
+  are skipped until explicitly installed with Zinit. Use
+  `ensure_worktree_installed`, `ensure_dotfiles_cli_installed`, or
+  `dotfiles_daily_update_notice` explicitly for maintenance.
+- Generated completions are stored under `~/.cache/zsh/generated/` (or
+  `$XDG_CACHE_HOME/zsh/generated/`). They regenerate when the executable path,
+  modification metadata, generator arguments or Zsh version changes. Failed
+  generation retains the previous completion; an unavailable cache is skipped.
+  Remove that generated directory explicitly to force a refresh.
+  Stable Devbox dispatchers generate completion directly, so switching the
+  selected build cannot reuse stale output from an unchanged launcher.
 - Modules live in `.zshrc.d/` and load recursively in lexical path order.
 - Top-level folders define coarse order, files inside them define local order.
 - Current groups are `00-core/`, `10-shell/`, `20-integrations/`, `70-os/`, and `90-local/`.
@@ -241,6 +255,8 @@ bash -n scripts/render-configs
 bash -n scripts/smoke-config-only
 zsh -n .zshenv
 zsh -n .zshrc
+zsh -n .zprofile
+zsh -f scripts/smoke-zsh-startup
 find .zshrc.d -type f -name '*.zsh' -print0 | xargs -0 -n1 zsh -n
 ./scripts/render-configs --dry-run
 ./setup --config-only --dry-run

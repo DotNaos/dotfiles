@@ -1,19 +1,5 @@
 # Completion system and command-specific completions.
 
-dotfiles_load_generated_completion() {
-  local cmd="$1"
-  shift
-
-  local completion
-
-  has "$cmd" || return 0
-
-  completion="$("$@" 2>/dev/null)" || return 0
-  [[ -n "$completion" ]] || return 0
-
-  source /dev/stdin <<< "$completion"
-}
-
 dotfiles_init_completions() {
   [[ -n "${__DOTFILES_COMPLETIONS_DONE:-}" ]] && return 0
 
@@ -46,6 +32,7 @@ dotfiles_init_completions() {
   done
   unset _toolkit_completion
 
+  dotfiles_load_uncached_completion devbox env COMPLETE=zsh devbox
   dotfiles_load_generated_completion jj env COMPLETE=zsh jj
   dotfiles_load_generated_completion moodle moodle completion zsh
   dotfiles_load_generated_completion codex codex completion zsh
