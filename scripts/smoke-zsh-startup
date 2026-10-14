@@ -49,6 +49,16 @@ chmod +x "$TEST_DIR/bin/completion-fixture"
 dotfiles_load_generated_completion completion-fixture completion-fixture second
 [[ "$DOTFILES_TEST_COMPLETION" == replaced ]] || fail 'executable replacement did not invalidate cache'
 
+# Same-size atomic replacements can retain second-granularity timestamps.
+printf '#!/bin/sh\nprintf "typeset -g DOTFILES_TEST_ATOMIC=before\\n"\n' > "$TEST_DIR/bin/atomic-fixture"
+printf '#!/bin/sh\nprintf "typeset -g DOTFILES_TEST_ATOMIC=after_\\n"\n' > "$TEST_DIR/bin/atomic-replacement"
+chmod +x "$TEST_DIR/bin/atomic-fixture" "$TEST_DIR/bin/atomic-replacement"
+touch -r "$TEST_DIR/bin/atomic-fixture" "$TEST_DIR/bin/atomic-replacement"
+dotfiles_load_generated_completion atomic-fixture atomic-fixture
+command mv "$TEST_DIR/bin/atomic-replacement" "$TEST_DIR/bin/atomic-fixture"
+dotfiles_load_generated_completion atomic-fixture atomic-fixture
+[[ "$DOTFILES_TEST_ATOMIC" == after_ ]] || fail 'same-size atomic replacement was stale'
+
 # A cache path occupied by a file must produce no output or partial state.
 print occupied > "$TEST_DIR/unavailable"
 DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/unavailable"
@@ -75,4 +85,46 @@ ZDOTDIR="$TEST_DIR/zdot" DOTFILES_ROOT="$ROOT_DIR" \
     [[ ${#path} -eq ${#unique} ]] || exit 1
     [[ "$DOTFILES_SHELL" == zsh ]] || exit 1
   '
+# Login PATH normalization must preserve an already selected fnm version.
+mkdir -p "$TEST_DIR/selected/bin"
+printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/selected/bin/node"
+chmod +x "$TEST_DIR/selected/bin/node"
+(
+  export FNM_MULTISHELL_PATH="$TEST_DIR/selected"
+  typeset -g __DOTFILES_FNM_READY=1
+  source "$ROOT_DIR/.zshrc.d/00-core/00-core.zsh"
+  path=("$FNM_MULTISHELL_PATH/bin" $path)
+  source "$ROOT_DIR/.zshrc.d/10-shell/00-paths.zsh"
+  [[ "$path[1]" == "$FNM_MULTISHELL_PATH/bin" ]] || fail 'fnm selection displaced'
+)
+
+# Test the NVM cache boundary with a provider fixture; aliases are resolved by
+# the provider on a miss and arbitrary installed commands remain on PATH.
+mkdir -p "$TEST_DIR/nvm/alias" "$TEST_DIR/nvm/versions/node/v1/bin" "$TEST_DIR/nvm/versions/node/v2/bin"
+for version in v1 v2; do
+  for cli in node nvm-global-fixture; do
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/nvm/versions/node/$version/bin/$cli"
+    chmod +x "$TEST_DIR/nvm/versions/node/$version/bin/$cli"
+  done
+done
+print v1 > "$TEST_DIR/nvm/alias/default"
+cat > "$TEST_DIR/nvm/nvm.sh" <<'NVM'
+print loaded >> "$NVM_DIR/provider-calls"
+export NVM_BIN="$NVM_DIR/versions/node/$(< "$NVM_DIR/alias/default")/bin"
+export PATH="$NVM_BIN:$PATH"
+NVM
+(
+  export NVM_DIR="$TEST_DIR/nvm" XDG_CACHE_HOME="$TEST_DIR/nvm-cache"
+  source "$ROOT_DIR/.zshrc.d/10-shell/39-nvm-path.zsh"
+  original_path=$PATH
+  dotfiles_prepare_nvm_path
+  [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v1/bin/nvm-global-fixture" ]] || fail 'NVM global CLI hidden'
+  PATH=$original_path
+  dotfiles_prepare_nvm_path
+  [[ "$(< "$NVM_DIR/provider-calls")" == loaded ]] || fail 'warm NVM cache loaded provider'
+  print v2 > "$NVM_DIR/alias/default"
+  PATH=$original_path
+  dotfiles_prepare_nvm_path
+  [[ "$(whence -p nvm-global-fixture)" == "$NVM_DIR/versions/node/v2/bin/nvm-global-fixture" ]] || fail 'NVM alias cache stale'
+)
 print 'zsh startup smoke passed'

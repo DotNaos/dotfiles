@@ -15,6 +15,7 @@ dotfiles_zinit_snippet OMZP::docker
 dotfiles_zinit_snippet OMZP::docker-compose
 dotfiles_zinit_snippet OMZP::brew
 # Keep the selected Node version behavior, but initialize NVM on first use.
+dotfiles_prepare_nvm_path
 zstyle ":omz:plugins:nvm" lazy yes
 dotfiles_zinit_snippet OMZP::nvm
 dotfiles_zinit_snippet OMZP::colorize
@@ -42,7 +43,7 @@ if has thefuck; then
 fi
 
 if has fzf || [[ -d "${FZF_BASE:-}" ]] || [[ -d "$HOME/.fzf" ]] || [[ -d "/opt/homebrew/opt/fzf" ]] || [[ -d "/usr/local/opt/fzf" ]]; then
-  [[ "$DOTFILES_PLATFORM" == macos ]] || dotfiles_zinit_snippet OMZP::fzf
+  dotfiles_zinit_snippet OMZP::fzf
 fi
 bindkey -e
 bindkey '^[[B' history-search-forward

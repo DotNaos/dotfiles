@@ -14,7 +14,7 @@ dotfiles_load_generated_completion() {
 
   local cache_dir="${DOTFILES_ZSH_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/zsh}/generated"
   local cache_file="$cache_dir/$cmd.zsh"
-  local signature="# dotfiles-cache-v1 $ZSH_VERSION ${(q)executable} $executable_stat[mtime] $executable_stat[ctime] $executable_stat[size] ${(j: :)${(q)@}}"
+  local signature="# dotfiles-cache-v2 $ZSH_VERSION ${(q)executable} $executable_stat[device] $executable_stat[inode] $executable_stat[mtime] $executable_stat[ctime] $executable_stat[size] ${(j: :)${(q)@}}"
   local header
   if [[ -f "$cache_file" && ! -L "$cache_file" ]]; then
     IFS= read -r header < "$cache_file"

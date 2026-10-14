@@ -174,7 +174,11 @@ do not clear this marker without reviewing or restoring those files.
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
 - `.zshrc` is a thin, idempotent loader; repeated sourcing does not duplicate hooks.
 - `.zprofile` reapplies PATH priority after the system login profile.
-- Homebrew paths use shell builtins; NVM initializes on the first Node-related command.
+- Homebrew paths use shell builtins. NVM's selected executable directory is
+  cached so global Node tools remain available immediately; full NVM setup runs
+  on the first Node-related command. On a cache miss, the existing NVM resolves
+  the version normally. Alias, installed-version and incoming Node-path changes
+  invalidate that cache; configurations without a default alias remain uncached.
 - Startup never clones plugins, builds CLIs, or fetches Git updates. Missing plugins
   are skipped until explicitly installed with Zinit. Use
   `ensure_worktree_installed`, `ensure_dotfiles_cli_installed`, or
@@ -184,6 +188,7 @@ do not clear this marker without reviewing or restoring those files.
   modification metadata, generator arguments or Zsh version changes. Failed
   generation retains the previous completion; an unavailable cache is skipped.
   Remove that generated directory explicitly to force a refresh.
+  The NVM path cache is the adjacent `nvm-default-path` file.
 - Modules live in `.zshrc.d/` and load recursively in lexical path order.
 - Top-level folders define coarse order, files inside them define local order.
 - Current groups are `00-core/`, `10-shell/`, `20-integrations/`, `70-os/`, and `90-local/`.

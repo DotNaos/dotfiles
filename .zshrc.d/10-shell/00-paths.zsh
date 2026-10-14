@@ -10,11 +10,9 @@ for __brew_prefix in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/
   [[ -x "$__brew_prefix/bin/brew" ]] || continue
   export HOMEBREW_PREFIX="$__brew_prefix"
   export HOMEBREW_CELLAR="$__brew_prefix/Cellar"
-  if [[ "$__brew_prefix" == /usr/local ]]; then
-    export HOMEBREW_REPOSITORY="$__brew_prefix/Homebrew"
-  else
-    export HOMEBREW_REPOSITORY="$__brew_prefix"
-  fi
+  # Standard Intel/Linux installs link bin/brew into prefix/Homebrew/bin.
+  __brew_executable="$__brew_prefix/bin/brew"
+  export HOMEBREW_REPOSITORY="${__brew_executable:A:h:h}"
   typeset -gU path fpath
   path=("$__brew_prefix/bin" "$__brew_prefix/sbin" $path)
   fpath=("$__brew_prefix/share/zsh/site-functions" $fpath)
@@ -27,7 +25,7 @@ for __brew_prefix in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/
   fi
   break
 done
-unset __brew_prefix
+unset __brew_prefix __brew_executable
 
 append_path_once "/usr/bin"
 append_path_once "/bin"
@@ -72,4 +70,10 @@ if [[ -d "$FNM_PATH" ]]; then
     typeset -g __DOTFILES_FNM_READY=1
     eval "$(fnm env)"
   fi
+fi
+
+# Login path_helper and the Homebrew prefix must not displace fnm's selection.
+if [[ -n ${FNM_MULTISHELL_PATH:-} && -d "$FNM_MULTISHELL_PATH/bin" ]]; then
+  path=("$FNM_MULTISHELL_PATH/bin" "${(@)path:#$FNM_MULTISHELL_PATH/bin}")
+  export PATH
 fi
