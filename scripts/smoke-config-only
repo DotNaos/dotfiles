@@ -4,7 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-config-only.XXXXXX")"
 PYTHON_CACHE="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-python-cache.XXXXXX")"
-trap 'rm -rf "$TEST_HOME" "$PYTHON_CACHE"' EXIT
+WSL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-wsl.XXXXXX")"
+trap 'rm -rf "$TEST_HOME" "$PYTHON_CACHE" "$WSL_HOME"' EXIT
 
 forbidden_pattern='apt-get|brew install|winget install|sudo (apt|cp|mv|sh)|scripts/system|/etc/'
 if rg -n "$forbidden_pattern" \
@@ -41,6 +42,14 @@ if command -v ssh >/dev/null 2>&1; then
   ssh -F "$TEST_HOME/.ssh/config" -G github.com >/dev/null
 fi
 test -L "$TEST_HOME/.config/zed"
+
+mkdir -p "$WSL_HOME/.config"
+printf 'text/plain=custom.desktop\n' > "$WSL_HOME/.config/mimeapps.list"
+HOME="$WSL_HOME" DOTFILES_CONTEXT_HOME="$WSL_HOME" DOTFILES_PLATFORM=wsl \
+  PYTHONPYCACHEPREFIX="$PYTHON_CACHE" "$ROOT_DIR/setup" --config-only
+test -L "$WSL_HOME/.config/mimeapps.list"
+cmp "$ROOT_DIR/context/platform/wsl/.config/mimeapps.list" "$WSL_HOME/.config/mimeapps.list"
+grep -Rq 'text/plain=custom.desktop' "$WSL_HOME/.dotfiles-backup"
 test -f "$TEST_HOME/.local/state/dotfiles/rendered/.codex/config.toml"
 cat >> "$TEST_HOME/.codex/config.toml" <<'TOML'
 
