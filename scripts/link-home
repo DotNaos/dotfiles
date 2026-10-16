@@ -322,6 +322,12 @@ fi
 
 link_raw_config_tree
 link_rendered_config_tree
+
+if [[ "$DOTFILES_PLATFORM" == "wsl" ]]; then
+  link_source_path "$ROOT_DIR/context/platform/wsl/.config/mimeapps.list" \
+    "$TARGET_HOME/.config/mimeapps.list" ".config/mimeapps.list"
+fi
+
 link_rendered_codex_files
 
 for item in "${LINK_ITEMS[@]}"; do
