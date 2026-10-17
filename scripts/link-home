@@ -35,13 +35,14 @@ MANAGED_CONFIG_ITEMS=(
 
 usage() {
   cat <<USAGE
-Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH] [--only codex]
+Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH] [--only codex|claude]
 
 Options:
   --dry-run     Print actions without executing
   --home PATH   Link into a different home directory
   --render-root PATH   Override the rendered config output directory
   --only codex  Render and link only the managed Codex files
+  --only claude Link the managed Claude instructions and apply private MCP servers
   -h, --help    Show this help
 USAGE
 }
@@ -235,6 +236,24 @@ link_rendered_codex_files() {
   done
 }
 
+link_claude_config() {
+  local apply_args=("--home" "$TARGET_HOME")
+
+  link_source_path "$ROOT_DIR/context/base/claude/CLAUDE.md" \
+    "$TARGET_HOME/.claude/CLAUDE.md" ".claude/CLAUDE.md"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    apply_args+=("--dry-run")
+  fi
+
+  # Private MCP servers are optional; a failure must not block the rest of the setup.
+  if ! "$ROOT_DIR/scripts/apply-claude-mcp" "${apply_args[@]}"; then
+    log "Claude MCP servers were not fully applied; see the messages above."
+    [[ "$ONLY" == "claude" ]] && return 1
+  fi
+  return 0
+}
+
 link_item() {
   local relative_path="$1"
   local source_path="$ROOT_DIR/$relative_path"
@@ -302,7 +321,7 @@ if [[ -z "$TARGET_HOME" ]]; then
   exit 1
 fi
 
-if [[ -n "$ONLY" && "$ONLY" != "codex" ]]; then
+if [[ -n "$ONLY" && "$ONLY" != "codex" && "$ONLY" != "claude" ]]; then
   log "Invalid --only value: $ONLY"
   usage
   exit 1
@@ -312,6 +331,13 @@ export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
 dotfiles_load_context
 
 log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
+
+if [[ "$ONLY" == "claude" ]]; then
+  link_claude_config
+  log "Done."
+  exit 0
+fi
+
 render_managed_configs
 
 if [[ "$ONLY" == "codex" ]]; then
@@ -329,6 +355,7 @@ if [[ "$DOTFILES_PLATFORM" == "wsl" ]]; then
 fi
 
 link_rendered_codex_files
+link_claude_config
 
 for item in "${LINK_ITEMS[@]}"; do
   link_item "$item"
