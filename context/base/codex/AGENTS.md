@@ -205,6 +205,7 @@ When Oli requests no additional CI or builds, use `[skip ci]` where supported, d
 - Split mixed workflows by platform: run their portable or Linux portions remotely and return to the Mac only for the Apple-specific portion. Do not repeat a successful remote workload locally merely for convenience.
 - Preserve reproducibility when offloading. Use the exact repository revision, task-owned worktree or isolated checkout, pinned toolchain, configuration, and canonical entry point; bring back the logs and artifacts needed to verify the result. Do not treat remote execution as permission to bypass repository policy, security boundaries, protected checks, or required platform-specific proof.
 - Before transferring source, artifacts, credentials, or private data to external infrastructure, confirm that the destination is authorized for that material and use the repository's supported secret flow. If the required remote target is unavailable or unsuitable, explain the constraint and run only the smallest necessary fallback locally.
+- On the work installation (`os-work`, including WSL), never offload source, artifacts, context or memory to a personal machine such as `os-pc` or `os-vps`, directly or through a proxy, tunnel or relay. Run work locally or on infrastructure the user has expressly approved for work, consistent with the isolation rules in `AGENT_MEMORY.md`. Other offloading rules in this section apply only within that boundary.
 
 ## Verification And Dogfooding
 
