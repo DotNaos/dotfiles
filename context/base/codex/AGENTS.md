@@ -197,6 +197,15 @@ When Oli requests no additional CI or builds, use `[skip ci]` where supported, d
 - Track the critical path and elapsed time during long tasks. Keep the user informed when the estimate changes, state what is consuming the time, and explain the concrete change being made to shorten the remaining loop.
 - Do not sacrifice required verification, but make verification proportional and staged: focused checks first, broader gates once the approach is stable, and one realistic end-to-end confirmation at the end.
 
+## Compute Placement
+
+- Offload as much compute-intensive, storage-intensive, long-running, and platform-independent work as practical from the Mac. This includes Linux builds, container builds, dependency compilation, broad test suites, CI preflights, packaging, data processing, and other workloads that do not require Apple hardware or macOS.
+- Prefer the user's `os-pc` Tailnet machine when it is online, suitable, and reachable. Otherwise use an appropriate repository-supported environment such as GitHub Codespaces, a remote Linux host, or another available compute service. Prefer existing capacity before provisioning new paid infrastructure.
+- Keep only lightweight coordination and genuinely Apple-specific work on the Mac. macOS and iOS builds, Simulator testing, Apple signing and notarization, Keychain-bound operations, and checks whose result depends on macOS should continue to run locally unless an equivalent trusted Apple runner is explicitly available.
+- Split mixed workflows by platform: run their portable or Linux portions remotely and return to the Mac only for the Apple-specific portion. Do not repeat a successful remote workload locally merely for convenience.
+- Preserve reproducibility when offloading. Use the exact repository revision, task-owned worktree or isolated checkout, pinned toolchain, configuration, and canonical entry point; bring back the logs and artifacts needed to verify the result. Do not treat remote execution as permission to bypass repository policy, security boundaries, protected checks, or required platform-specific proof.
+- Before transferring source, artifacts, credentials, or private data to external infrastructure, confirm that the destination is authorized for that material and use the repository's supported secret flow. If the required remote target is unavailable or unsuitable, explain the constraint and run only the smallest necessary fallback locally.
+
 ## Verification And Dogfooding
 
 - Define finishing criteria before you start and use them to decide when the task is complete.
