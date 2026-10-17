@@ -127,6 +127,16 @@ This is the primary operating protocol for every Codex task. Execute it as early
 - Never revert or overwrite changes you did not make unless the user explicitly asks for that.
 - When reporting back after a commit or PR, mention whether you included other existing changes or intentionally left any out.
 
+## Owner administrator merge invariant
+
+<!-- dotnaos-owner-admin-merge:v1 -->
+
+The [canonical repository invariants](https://github.com/DotNaos/architecture/blob/main/docs/repository-invariants.md) apply to all of Oli's existing and future repositories, independently of template adoption.
+
+Oli's human owner/admin account must always be able to merge a pull request into `main` when there are no merge conflicts. CI results must never block this ability, including failed, pending, cancelled, missing, skipped or unavailable checks. All applicable repository protections, rulesets and setup defaults must preserve an effective explicit human admin bypass.
+
+Keep check results truthful and continue normal verification and reporting, without making verification a prerequisite for Oli's human bypass. This human merge capability takes precedence over contrary repository merge-gate wording. It does not itself grant agents, apps, bots or integrations new privileges or new permission to merge; previously granted authorization remains effective within its scope. Record live configuration separately from this policy.
+
 ## CI/CD Pipeline Changes Need Manual Approval
 
 - Do not edit a CI/CD pipeline on your own initiative. Before changing a workflow, reusable action, runner setup, release or deployment automation, or supporting script or configuration that changes CI/CD behavior, show me the specific proposed change, its effect on checks and delivery, and any checks it removes or weakens. Wait for my explicit manual approval before making that change.
