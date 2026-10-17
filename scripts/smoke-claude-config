@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Isolated check for the managed Claude Code files. Uses a stub claude CLI and
+# placeholder server definitions; it never touches the real home or ~/.claude.json.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-claude.XXXXXX")"
+STUB_BIN="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-claude-bin.XXXXXX")"
+trap 'rm -rf "$TEST_HOME" "$STUB_BIN"' EXIT
+
+fail() { printf 'claude smoke failed: %s\n' "$*" >&2; exit 1; }
+
+cat > "$STUB_BIN/claude" <<'STUB'
+#!/usr/bin/env bash
+# Minimal stand-in for: claude mcp remove|add-json --scope user NAME [JSON]
+state="$HOME/.claude.json"
+[[ -f "$state" ]] || echo '{}' > "$state"
+[[ "$1" == "mcp" && "$3" == "--scope" && "$4" == "user" ]] || exit 2
+case "$2" in
+  remove) jq --arg n "$5" 'del(.mcpServers[$n])' "$state" > "$state.tmp" ;;
+  add-json) jq --arg n "$5" --argjson v "$6" '.mcpServers[$n] = $v' "$state" > "$state.tmp" ;;
+  *) exit 2 ;;
+esac
+mv "$state.tmp" "$state"
+STUB
+chmod +x "$STUB_BIN/claude"
+
+export PATH="$STUB_BIN:$PATH"
+export HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME"
+export DOTFILES_PLATFORM=macos DOTFILES_ROLE=default
+APPLY="$ROOT_DIR/scripts/apply-claude-mcp"
+PRIVATE_DIR="$TEST_HOME/.config/dotfiles/claude/macos"
+
+# 1. Nothing configured: succeeds without creating state.
+"$APPLY" --home "$TEST_HOME"
+[[ ! -e "$TEST_HOME/.claude.json" ]] || fail "state created without a private file"
+
+# 2. Group/world-readable private file is refused.
+mkdir -p "$PRIVATE_DIR"
+printf '%s\n' '{"mcpServers":{"demo":{"type":"stdio","command":"example-cmd","args":["--flag"]}}}' \
+  > "$PRIVATE_DIR/default.mcp.json"
+chmod 644 "$PRIVATE_DIR/default.mcp.json"
+if "$APPLY" --home "$TEST_HOME" 2>/dev/null; then fail "permissive file accepted"; fi
+
+# 3. Apply preserves unrelated state, is idempotent, and updates changes.
+chmod 600 "$PRIVATE_DIR/default.mcp.json"
+echo '{"userID":"keep-me","mcpServers":{"other":{"type":"http","url":"https://example.invalid"}}}' > "$TEST_HOME/.claude.json"
+"$APPLY" --home "$TEST_HOME" --dry-run | grep -Fq 'would configure demo' || fail "dry-run did not report demo"
+jq -e '.mcpServers | has("demo") | not' "$TEST_HOME/.claude.json" >/dev/null || fail "dry-run changed state"
+"$APPLY" --home "$TEST_HOME" | grep -Fq 'Configured: demo' || fail "demo not configured"
+jq -e '.userID == "keep-me" and .mcpServers.other.url == "https://example.invalid" and .mcpServers.demo.command == "example-cmd"' \
+  "$TEST_HOME/.claude.json" >/dev/null || fail "state not merged correctly"
+"$APPLY" --home "$TEST_HOME" | grep -Fq 'Already configured: demo' || fail "second run not idempotent"
+printf '%s\n' '{"mcpServers":{"demo":{"type":"stdio","command":"example-cmd-2"}}}' > "$PRIVATE_DIR/default.mcp.json"
+"$APPLY" --home "$TEST_HOME" | grep -Fq 'Configured: demo' || fail "changed definition not applied"
+jq -e '.mcpServers.demo.command == "example-cmd-2"' "$TEST_HOME/.claude.json" >/dev/null || fail "update not stored"
+
+# 4. The work role never receives the personal memory server.
+mkdir -p "$PRIVATE_DIR"
+printf '%s\n' '{"mcpServers":{"agent-memory":{"type":"stdio","command":"example-cmd"}}}' > "$PRIVATE_DIR/work.mcp.json"
+chmod 600 "$PRIVATE_DIR/work.mcp.json"
+if DOTFILES_ROLE=work "$APPLY" --home "$TEST_HOME" 2>/dev/null; then fail "agent-memory accepted for role=work"; fi
+jq -e '.mcpServers | has("agent-memory") | not' "$TEST_HOME/.claude.json" >/dev/null || fail "agent-memory leaked into work state"
+
+# 5. link-home --only claude links instructions and backs up an existing file.
+mkdir -p "$TEST_HOME/.claude"
+echo "previous" > "$TEST_HOME/.claude/CLAUDE.md"
+"$ROOT_DIR/scripts/link-home" --home "$TEST_HOME" --only claude >/dev/null
+[[ -L "$TEST_HOME/.claude/CLAUDE.md" ]] || fail "CLAUDE.md not linked"
+[[ "$(readlink "$TEST_HOME/.claude/CLAUDE.md")" == "$ROOT_DIR/context/base/claude/CLAUDE.md" ]] || fail "wrong link target"
+grep -rqx 'previous' "$TEST_HOME/.dotfiles-backup" || fail "previous CLAUDE.md not backed up"
+
+# 6. The tracked instructions contain no addresses, credentials or user paths.
+if grep -n -E '([0-9]{1,3}\.){3}[0-9]{1,3}|/Users/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}|(token|secret|password)[[:space:]]*[:=]' \
+  "$ROOT_DIR/context/base/claude/CLAUDE.md"; then
+  fail "sensitive pattern in tracked Claude instructions"
+fi
+
+printf 'claude smoke passed\n'

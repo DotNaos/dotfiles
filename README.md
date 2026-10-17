@@ -169,6 +169,51 @@ interrupted, a protected `.publish-pending` marker blocks further rendering
 until local recovery has checked the private settings, output and history;
 do not clear this marker without reviewing or restoring those files.
 
+## Claude Code
+
+Claude Code keeps credentials, account data, history and per-project state in
+`~/.claude.json` and `~/.claude/`. None of that is versioned, and neither are
+`settings.json` (it contains machine-specific paths and permissions) nor
+`settings.local.json`. Two things are managed:
+
+- `context/base/claude/CLAUDE.md` contains the portable global instructions. The
+  linker links it to `~/.claude/CLAUDE.md` and backs up a conflicting file.
+- User-scope MCP servers are applied through the `claude mcp` CLI by
+  `scripts/apply-claude-mcp`. Only the listed servers are added or updated;
+  everything else in `~/.claude.json` is left to Claude Code. Servers are never
+  removed automatically.
+
+As with Codex, connection details (commands, hosts, paths, arguments, tokens)
+stay out of this public repository. They live in an owner-only file per platform
+and role:
+
+```text
+~/.config/dotfiles/claude/<platform>/<role>.mcp.json   # mode 600
+```
+
+```json
+{
+  "mcpServers": {
+    "example": { "type": "stdio", "command": "ssh", "args": ["example-host", "example-command"] }
+  }
+}
+```
+
+The file uses the same shape as a project `.mcp.json`. The script refuses files
+that are readable by group or others, logs only server names, and skips quietly
+when no file exists. It also refuses an `agent-memory` entry for `role=work`: the
+work installation keeps its own memory system (see [AGENT_MEMORY.md](AGENT_MEMORY.md)).
+
+```bash
+./scripts/link-home --only claude --dry-run
+./scripts/link-home --only claude
+```
+
+The full `./setup --config-only` run applies the same steps. `jq` and the `claude`
+CLI must be installed by system provisioning; the script never installs them.
+`./scripts/smoke-claude-config` checks the behaviour in an isolated home with a
+stub CLI and placeholder values.
+
 ## Zsh layout
 
 - `.zshenv` bootstraps shared environment and PATH setup for every zsh process.
@@ -253,6 +298,8 @@ bash -n scripts/setup
 bash -n scripts/link-home
 bash -n scripts/render-configs
 bash -n scripts/smoke-config-only
+bash -n scripts/apply-claude-mcp
+bash -n scripts/smoke-claude-config
 zsh -n .zshenv
 zsh -n .zshrc
 zsh -n .zprofile
@@ -261,4 +308,5 @@ find .zshrc.d -type f -name '*.zsh' -print0 | xargs -0 -n1 zsh -n
 ./scripts/render-configs --dry-run
 ./setup --config-only --dry-run
 ./scripts/smoke-config-only
+./scripts/smoke-claude-config
 ```

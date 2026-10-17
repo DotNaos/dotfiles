@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Apply private user-scope MCP servers to Claude Code through the claude CLI.
+#
+# The server definitions never live in this repository. They are read from
+#   ~/.config/dotfiles/claude/<platform>/<role>.mcp.json
+# (owner-only, shape: {"mcpServers": {"<name>": {...}}}). Only names are logged.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_HOME="${HOME}"
+DRY_RUN=0
+
+# shellcheck source=scripts/lib/context.sh
+source "$ROOT_DIR/scripts/lib/context.sh"
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/apply-claude-mcp [--dry-run] [--home PATH]
+
+Options:
+  --dry-run    Report what would change without calling the claude CLI
+  --home PATH  Use a different home directory
+  -h, --help   Show this help
+USAGE
+}
+
+log() {
+  printf '[apply-claude-mcp] %s\n' "$*"
+}
+
+file_mode() {
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --home) TARGET_HOME="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) log "Unknown argument: $1"; usage; exit 1 ;;
+  esac
+done
+
+if [[ -z "$TARGET_HOME" ]]; then
+  log "Target home must not be empty."
+  exit 1
+fi
+
+export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
+dotfiles_load_context
+
+PRIVATE_FILE="$TARGET_HOME/.config/dotfiles/claude/$DOTFILES_PLATFORM/$DOTFILES_ROLE.mcp.json"
+USER_STATE="$TARGET_HOME/.claude.json"
+
+if [[ ! -f "$PRIVATE_FILE" ]]; then
+  log "No private MCP file for platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE; nothing to apply."
+  exit 0
+fi
+
+for tool in jq claude; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    log "Missing required tool: $tool"
+    exit 1
+  fi
+done
+
+mode="$(file_mode "$PRIVATE_FILE")"
+if [[ "$mode" != "600" && "$mode" != "400" ]]; then
+  log "Refusing to read the private MCP file: expected mode 600, found $mode."
+  exit 1
+fi
+
+if ! jq -e '(.mcpServers | type) == "object"' "$PRIVATE_FILE" >/dev/null 2>&1; then
+  log "The private MCP file must be JSON with an object at .mcpServers."
+  exit 1
+fi
+
+# The work installation keeps its own memory system and never reaches os-vps.
+if [[ "$DOTFILES_ROLE" == "work" ]] \
+  && jq -e '.mcpServers | has("agent-memory")' "$PRIVATE_FILE" >/dev/null; then
+  log "Refusing agent-memory for role=work; work memory must stay local (see AGENT_MEMORY.md)."
+  exit 1
+fi
+
+log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE"
+
+status=0
+while IFS= read -r name; do
+  desired="$(jq -cS --arg n "$name" '.mcpServers[$n]' "$PRIVATE_FILE")"
+  current="null"
+  if [[ -f "$USER_STATE" ]]; then
+    current="$(jq -cS --arg n "$name" '.mcpServers[$n] // null' "$USER_STATE")"
+  fi
+
+  if [[ "$current" == "$desired" ]]; then
+    log "Already configured: $name"
+    continue
+  fi
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "dry-run: would configure $name"
+    continue
+  fi
+
+  if [[ "$current" != "null" ]]; then
+    HOME="$TARGET_HOME" claude mcp remove --scope user "$name" >/dev/null 2>&1 || true
+  fi
+  if HOME="$TARGET_HOME" claude mcp add-json --scope user "$name" "$desired" >/dev/null 2>&1; then
+    log "Configured: $name"
+  else
+    log "Failed to configure: $name"
+    status=1
+  fi
+done < <(jq -r '.mcpServers | keys[]' "$PRIVATE_FILE")
+
+exit "$status"
