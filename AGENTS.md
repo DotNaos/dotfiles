@@ -14,6 +14,16 @@ Walk through two-way doors and show me after. Stop at one-way doors; If my answe
 
 Once I open a one-way door, it stays open for that work, including for any subagent you hand it to (quote me). Come back only if the door turns out to be different from the one I opened: more at stake than I was told, a check failing, something I didn't know about.
 
+## Owner administrator merge invariant
+
+<!-- dotnaos-owner-admin-merge:v1 -->
+
+The [canonical repository invariants](https://github.com/DotNaos/architecture/blob/main/docs/repository-invariants.md) apply to all of Oli's existing and future repositories, independently of template adoption.
+
+Oli's human owner/admin account must always be able to merge a pull request into `main` when there are no merge conflicts. CI results must never block this ability, including failed, pending, cancelled, missing, skipped or unavailable checks. All applicable repository protections, rulesets and setup defaults must preserve an effective explicit human admin bypass.
+
+Keep check results truthful and continue normal verification and reporting, without making verification a prerequisite for Oli's human bypass. This human merge capability takes precedence over contrary repository merge-gate wording. It does not itself grant agents, apps, bots or integrations new privileges or new permission to merge; previously granted authorization remains effective within its scope. Record live configuration separately from this policy.
+
 ## GitHub issue planning and milestones
 
 <!-- dotnaos-issue-intake:v1 -->
