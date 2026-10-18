@@ -173,11 +173,17 @@ do not clear this marker without reviewing or restoring those files.
 
 Claude Code keeps credentials, account data, history and per-project state in
 `~/.claude.json` and `~/.claude/`. None of that is versioned, and neither are
-`settings.json` (it contains machine-specific paths and permissions) nor
-`settings.local.json`. Two things are managed:
+the live `settings.json` (it contains machine-specific paths and permissions) nor
+`settings.local.json`. Three things are managed:
 
 - `context/base/claude/CLAUDE.md` contains the portable global instructions. The
   linker links it to `~/.claude/CLAUDE.md` and backs up a conflicting file.
+- `context/base/claude/settings.json` contains only portable user settings (the
+  default permission mode and the matching dialog flag). `scripts/apply-claude-settings`
+  deep-merges it into `~/.claude/settings.json` with `jq`; all other keys stay
+  untouched, and an invalid live file is refused. The live file is not a symlink
+  because Claude Code writes to it. Claude Code ignores `bypassPermissions` as a
+  default in project and local settings, so it only works from the user file.
 - User-scope MCP servers are applied through the `claude mcp` CLI by
   `scripts/apply-claude-mcp`. Only the listed servers are added or updated;
   everything else in `~/.claude.json` is left to Claude Code. Servers are never

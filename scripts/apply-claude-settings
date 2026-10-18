@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Merge the portable Claude Code user settings into ~/.claude/settings.json.
+#
+# context/base/claude/settings.json holds only keys that are safe to publish.
+# They are deep-merged into the live file; every other key (machine-specific
+# permission rules, plugin state, UI state written by Claude Code) is kept.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_HOME="${HOME}"
+DRY_RUN=0
+SOURCE_FILE="$ROOT_DIR/context/base/claude/settings.json"
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/apply-claude-settings [--dry-run] [--home PATH]
+
+Options:
+  --dry-run    Report what would change without writing
+  --home PATH  Use a different home directory
+  -h, --help   Show this help
+USAGE
+}
+
+log() {
+  printf '[apply-claude-settings] %s\n' "$*"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --home) TARGET_HOME="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) log "Unknown argument: $1"; usage; exit 1 ;;
+  esac
+done
+
+if [[ -z "$TARGET_HOME" ]]; then
+  log "Target home must not be empty."
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  log "Missing required tool: jq"
+  exit 1
+fi
+
+if ! jq -e 'type == "object"' "$SOURCE_FILE" >/dev/null 2>&1; then
+  log "The managed settings file must be a JSON object: $SOURCE_FILE"
+  exit 1
+fi
+
+TARGET_FILE="$TARGET_HOME/.claude/settings.json"
+current='{}'
+if [[ -e "$TARGET_FILE" ]]; then
+  if ! jq -e 'type == "object"' "$TARGET_FILE" >/dev/null 2>&1; then
+    log "Refusing to change $TARGET_FILE: it is not a valid JSON object."
+    exit 1
+  fi
+  current="$(jq -S . "$TARGET_FILE")"
+fi
+
+merged="$(jq -S -s '.[0] * .[1]' <(printf '%s' "$current") "$SOURCE_FILE")"
+
+if [[ "$merged" == "$current" && -e "$TARGET_FILE" ]]; then
+  log "Already up to date: .claude/settings.json"
+  exit 0
+fi
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  log "dry-run: would merge managed keys into .claude/settings.json"
+  exit 0
+fi
+
+mkdir -p "$(dirname "$TARGET_FILE")"
+# Keep the user's key order and formatting: merge into the original, not the sorted copy.
+tmp="$(mktemp "$TARGET_FILE.XXXXXX")"
+if [[ -e "$TARGET_FILE" ]]; then
+  jq -s '.[0] * .[1]' "$TARGET_FILE" "$SOURCE_FILE" > "$tmp"
+  chmod --reference="$TARGET_FILE" "$tmp" 2>/dev/null || chmod "$(stat -f '%Lp' "$TARGET_FILE")" "$tmp"
+else
+  jq -s '.[0] * .[1]' <(echo '{}') "$SOURCE_FILE" > "$tmp"
+  chmod 644 "$tmp"
+fi
+mv "$tmp" "$TARGET_FILE"
+log "Merged managed keys into .claude/settings.json"
