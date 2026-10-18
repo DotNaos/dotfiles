@@ -42,7 +42,7 @@ Options:
   --home PATH   Link into a different home directory
   --render-root PATH   Override the rendered config output directory
   --only codex  Render and link only the managed Codex files
-  --only claude Link the managed Claude instructions and apply private MCP servers
+  --only claude Link the managed Claude instructions, merge portable settings and apply private MCP servers
   -h, --help    Show this help
 USAGE
 }
@@ -244,6 +244,12 @@ link_claude_config() {
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
     apply_args+=("--dry-run")
+  fi
+
+  # Portable settings merge into the live file; a failure must not block the rest.
+  if ! "$ROOT_DIR/scripts/apply-claude-settings" "${apply_args[@]}"; then
+    log "Claude settings were not applied; see the messages above."
+    [[ "$ONLY" == "claude" ]] && return 1
   fi
 
   # Private MCP servers are optional; a failure must not block the rest of the setup.

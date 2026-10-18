@@ -70,9 +70,27 @@ echo "previous" > "$TEST_HOME/.claude/CLAUDE.md"
 [[ "$(readlink "$TEST_HOME/.claude/CLAUDE.md")" == "$ROOT_DIR/context/base/claude/CLAUDE.md" ]] || fail "wrong link target"
 grep -rqx 'previous' "$TEST_HOME/.dotfiles-backup" || fail "previous CLAUDE.md not backed up"
 
-# 6. The tracked instructions contain no addresses, credentials or user paths.
+# 5b. Portable settings merge keeps local keys, is idempotent and honours dry-run.
+SETTINGS="$TEST_HOME/.claude/settings.json"
+rm -f "$SETTINGS"
+APPLY_SETTINGS="$ROOT_DIR/scripts/apply-claude-settings"
+"$APPLY_SETTINGS" --home "$TEST_HOME" >/dev/null
+jq -e '.permissions.defaultMode == "bypassPermissions" and .skipDangerousModePermissionPrompt == true' "$SETTINGS" >/dev/null \
+  || fail "managed settings not created"
+echo '{"permissions":{"allow":["Bash(demo:*)"],"defaultMode":"default"},"enabledPlugins":{"demo@example":true}}' > "$SETTINGS"
+"$APPLY_SETTINGS" --home "$TEST_HOME" --dry-run | grep -Fq 'would merge' || fail "settings dry-run did not report a change"
+jq -e '.permissions.defaultMode == "default"' "$SETTINGS" >/dev/null || fail "settings dry-run changed the file"
+"$APPLY_SETTINGS" --home "$TEST_HOME" >/dev/null
+jq -e '.permissions.defaultMode == "bypassPermissions" and .permissions.allow == ["Bash(demo:*)"] and .enabledPlugins["demo@example"] == true' \
+  "$SETTINGS" >/dev/null || fail "settings merge lost local keys"
+"$APPLY_SETTINGS" --home "$TEST_HOME" | grep -Fq 'Already up to date' || fail "settings merge not idempotent"
+echo '{broken' > "$SETTINGS"
+if "$APPLY_SETTINGS" --home "$TEST_HOME" 2>/dev/null; then fail "invalid settings file accepted"; fi
+grep -Fqx '{broken' "$SETTINGS" || fail "invalid settings file was modified"
+
+# 6. The tracked instructions and settings contain no addresses, credentials or user paths.
 if grep -n -E '([0-9]{1,3}\.){3}[0-9]{1,3}|/Users/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}|(token|secret|password)[[:space:]]*[:=]' \
-  "$ROOT_DIR/context/base/claude/CLAUDE.md"; then
+  "$ROOT_DIR/context/base/claude/CLAUDE.md" "$ROOT_DIR/context/base/claude/settings.json"; then
   fail "sensitive pattern in tracked Claude instructions"
 fi
 
