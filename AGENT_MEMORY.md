@@ -5,6 +5,17 @@ rendered Codex clients. It loads the versioned guide from the configured Agent
 Memory service before context-dependent work. The full guide stays maintained
 in Agent Memory, not duplicated here.
 
+## Recording rule for Codex and Claude Code
+
+Both `context/base/codex/AGENTS.md` and `context/base/claude/CLAUDE.md` carry the
+same standing authorization to append `work-log`, `handoff`, `correction` and
+quoted-approval `decision` entries on a fixed list of events (PR opened or merged,
+deployment or rollback, finished check, blocker, handoff). The two sections must be
+kept identical in substance so that Codex, Claude Code and ChatGPT see the same
+record of each other's work. Roadmap commits, relationship links and decisions
+about an agent's own proposals remain per-task authorizations. Background:
+[idea-space plan 2026-10-21-agent-austausch-claude-codex](https://github.com/DotNaos/idea-space/blob/main/plans/2026-10-21-agent-austausch-claude-codex.md).
+
 ## Connection and scope
 
 A ChatGPT-connected Agent Memory app can be available through Codex's app tools
