@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Switch the CI of the DotNaos repositories between the self-hosted runners on
+# os-pc and GitHub-hosted Linux, and show where each repository currently runs.
+#
+# The switch is one repository variable per repository (see
+# scripts/ci-runners.repos). The workflows read it as
+#   runs-on: ${{ fromJSON(vars.<VARIABLE> || '<self-hosted default>') }}
+# so "hosted" sets the variable and "self-hosted" deletes it. Nothing else
+# changes; the next job of each workflow picks the new runner up.
+#
+# Requires an authenticated `gh` with access to the repositories.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MANIFEST="$ROOT_DIR/scripts/ci-runners.repos"
+OWNER="${CI_RUNNERS_OWNER:-DotNaos}"
+HOSTED_LABEL="${CI_RUNNERS_HOSTED_LABEL:-ubuntu-latest}"
+DRY_RUN=0
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/ci-runners status [repo ...]
+       ./scripts/ci-runners switch hosted|self-hosted [--label LABEL] [--dry-run] [repo ...]
+
+Commands:
+  status                Show, per repository, whether CI runs self-hosted or hosted
+  switch hosted         Set every listed variable to a JSON label (default "$HOSTED_LABEL")
+  switch self-hosted    Delete every listed variable so the workflow default applies
+
+Options:
+  --label LABEL         Hosted runner label, e.g. ubuntu-latest or ubuntu-24.04
+  --dry-run             Print the gh commands instead of running them
+  -h, --help            Show this help
+
+Without repositories every entry of scripts/ci-runners.repos is affected.
+Repositories are the short names from the manifest (owner: $OWNER).
+USAGE
+}
+
+log() {
+  printf '[ci-runners] %s\n' "$*"
+}
+
+die() {
+  log "$*" >&2
+  exit 1
+}
+
+# Print "<repo> <variable>" for every manifest entry, or only the requested repos.
+entries() {
+  local requested=("$@") line repo variable found
+  while read -r repo variable _; do
+    [[ -z "$repo" || "$repo" == \#* ]] && continue
+    [[ -z "$variable" ]] && die "Manifest entry without a variable: $repo"
+    if [[ ${#requested[@]} -gt 0 ]]; then
+      found=0
+      for line in "${requested[@]}"; do
+        [[ "$line" == "$repo" ]] && found=1
+      done
+      [[ $found -eq 1 ]] || continue
+    fi
+    printf '%s %s\n' "$repo" "$variable"
+  done < "$MANIFEST"
+}
+
+check_requested() {
+  local repo known
+  for repo in "$@"; do
+    known=0
+    while read -r line _; do
+      [[ "$line" == "$repo" ]] && known=1
+    done < <(entries)
+    [[ $known -eq 1 ]] || die "Repository '$repo' is not in $MANIFEST"
+  done
+}
+
+run() {
+  if [[ $DRY_RUN -eq 1 ]]; then
+    printf '  + %s\n' "$*"
+  else
+    "$@"
+  fi
+}
+
+variable_value() {
+  # Prints the variable value, or nothing when it is unset.
+  gh variable get "$2" --repo "$OWNER/$1" 2>/dev/null || true
+}
+
+cmd_status() {
+  local repo variable value
+  check_requested "$@"
+  printf '%-16s %-26s %-12s %s\n' "repository" "variable" "runner" "value"
+  while read -r repo variable; do
+    value="$(variable_value "$repo" "$variable")"
+    if [[ -z "$value" ]]; then
+      printf '%-16s %-26s %-12s %s\n' "$repo" "$variable" "self-hosted" "(unset, workflow default)"
+    else
+      printf '%-16s %-26s %-12s %s\n' "$repo" "$variable" "hosted" "$value"
+    fi
+  done < <(entries "$@")
+}
+
+cmd_switch() {
+  local target="${1:-}"
+  shift || true
+  local repos=() repo variable
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --label) HOSTED_LABEL="${2:-}"; [[ -n "$HOSTED_LABEL" ]] || die "--label needs a value"; shift 2 ;;
+      --dry-run) DRY_RUN=1; shift ;;
+      -h|--help) usage; exit 0 ;;
+      -*) die "Unknown option: $1" ;;
+      *) repos+=("$1"); shift ;;
+    esac
+  done
+  # ${repos[@]+...} keeps bash 3.2 (macOS) happy under set -u with an empty array.
+  check_requested ${repos[@]+"${repos[@]}"}
+  case "$target" in
+    hosted)
+      log "Switching to GitHub-hosted runners (label \"$HOSTED_LABEL\")"
+      while read -r repo variable; do
+        log "$repo: set $variable"
+        run gh variable set "$variable" --repo "$OWNER/$repo" --body "\"$HOSTED_LABEL\""
+      done < <(entries ${repos[@]+"${repos[@]}"})
+      ;;
+    self-hosted)
+      log "Switching back to the self-hosted runners (deleting the variables)"
+      while read -r repo variable; do
+        if [[ -z "$(variable_value "$repo" "$variable")" ]]; then
+          log "$repo: $variable already unset"
+          continue
+        fi
+        log "$repo: delete $variable"
+        run gh variable delete "$variable" --repo "$OWNER/$repo"
+      done < <(entries ${repos[@]+"${repos[@]}"})
+      ;;
+    *)
+      die "switch needs 'hosted' or 'self-hosted' (got '${target:-nothing}')"
+      ;;
+  esac
+  log "Running jobs keep their runner; the next job of each workflow uses the new one."
+  log "A workflow only honours the variable once its runs-on reads vars.<VARIABLE>."
+}
+
+[[ -f "$MANIFEST" ]] || die "Manifest not found: $MANIFEST"
+command -v gh >/dev/null || die "gh is not installed"
+
+case "${1:-}" in
+  status) shift; cmd_status "$@" ;;
+  switch) shift; cmd_switch "$@" ;;
+  -h|--help|"") usage; [[ "${1:-}" == "" ]] && exit 1 || exit 0 ;;
+  *) die "Unknown command: $1" ;;
+esac

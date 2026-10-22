@@ -274,6 +274,33 @@ Notes:
   its project and config; `withsecrets` always selects local development.
 - `env-load` remains a generic, explicit project env-file loader.
 
+## CI runner switch
+
+The CI of the repositories listed in `scripts/ci-runners.repos` can run either on
+the repository-scoped self-hosted runners on os-pc or on GitHub-hosted Linux. Each
+workflow reads one repository variable:
+
+```yaml
+runs-on: ${{ fromJSON(vars.<REPO>_RUNS_ON || '["self-hosted","Linux","X64","os-pc-linux"]') }}
+```
+
+`scripts/ci-runners` flips those variables for every listed repository through `gh`
+(an authenticated `gh` with access to the repositories is required):
+
+```bash
+./scripts/ci-runners status                      # where does each repository run right now?
+./scripts/ci-runners switch hosted               # set every variable to "ubuntu-latest"
+./scripts/ci-runners switch hosted --label ubuntu-24.04 ui chat
+./scripts/ci-runners switch self-hosted          # delete the variables, workflow defaults apply
+./scripts/ci-runners switch hosted --dry-run     # print the gh commands only
+```
+
+Running jobs keep their runner; the next job of each workflow uses the new one. Only
+repositories whose jobs need nothing from os-pc belong in the manifest (no `devbox-ci`
+account, local Git source cache, Docker socket, KVM, GPU or Tailnet access). Hosted
+minutes are limited, so a switch to hosted is meant to be reversed with
+`switch self-hosted` once the self-hosted runners are healthy again.
+
 ## Local Python growth audit
 
 Use the optional, read-only Git worktree check before committing project changes:
@@ -305,6 +332,7 @@ bash -n scripts/link-home
 bash -n scripts/render-configs
 bash -n scripts/smoke-config-only
 bash -n scripts/apply-claude-mcp
+bash -n scripts/ci-runners
 bash -n scripts/smoke-claude-config
 zsh -n .zshenv
 zsh -n .zshrc

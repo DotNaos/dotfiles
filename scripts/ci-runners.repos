@@ -1,0 +1,20 @@
+# Repositories whose CI can run on GitHub-hosted Linux instead of the
+# repository-scoped self-hosted runner on os-pc.
+#
+# One entry per line: <repository> <variable>
+# The workflow reads `vars.<variable>` through
+#   runs-on: ${{ fromJSON(vars.<variable> || '<self-hosted default>') }}
+# An unset variable means the self-hosted default; a JSON label such as
+# "ubuntu-latest" moves the jobs to GitHub-hosted runners.
+#
+# Only list repositories whose jobs need nothing from os-pc (no devbox-ci
+# account, no local Git source cache, no Docker socket, KVM, GPU or Tailnet
+# access). design-space, project-template, devbox, study-space, mobile and the
+# Infrastructure k3s deploy workflows stay self-hosted on purpose.
+chat            CHAT_RUNS_ON
+architecture    ARCHITECTURE_RUNS_ON
+agent-memory    AGENT_MEMORY_RUNS_ON
+infrastructure  INFRASTRUCTURE_RUNS_ON
+inventory       INVENTORY_RUNS_ON
+usage-watch     USAGE_WATCH_RUNS_ON
+ui              UI_RUNS_ON
