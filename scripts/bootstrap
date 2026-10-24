@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-printf '[bootstrap] %s\n' "Deprecated entrypoint. Forwarding to ./scripts/setup."
-exec "$ROOT_DIR/scripts/setup" "$@"

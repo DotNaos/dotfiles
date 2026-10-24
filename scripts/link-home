@@ -15,10 +15,12 @@ source "$ROOT_DIR/scripts/lib/context.sh"
 LINK_ITEMS=(
   ".local/bin/papercut"
   ".jj"
+  ".ssh/config"
   ".tmux.conf"
   ".zsh"
   ".zsh_aliases"
   ".zshenv"
+  ".zprofile"
   ".zshrc"
   ".zshrc.d"
   ".zshrc_functions"
@@ -34,13 +36,14 @@ MANAGED_CONFIG_ITEMS=(
 
 usage() {
   cat <<USAGE
-Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH] [--only codex]
+Usage: ./scripts/link-home [--dry-run] [--home PATH] [--render-root PATH] [--only codex|claude]
 
 Options:
   --dry-run     Print actions without executing
   --home PATH   Link into a different home directory
   --render-root PATH   Override the rendered config output directory
   --only codex  Render and link only the managed Codex files
+  --only claude Link the managed Claude instructions, merge portable settings and apply private MCP servers
   -h, --help    Show this help
 USAGE
 }
@@ -139,7 +142,20 @@ render_managed_configs() {
   local render_script="$ROOT_DIR/scripts/render-configs"
   local render_args=("--home" "$TARGET_HOME" "--render-root" "$(rendered_config_root)")
 
-  [[ -x "$render_script" ]] || return 0
+  if [[ ! -x "$render_script" ]]; then
+    log "The configuration renderer is unavailable; no links were changed."
+    return 1
+  fi
+
+  if [[ "$DRY_RUN" -ne 1 ]]; then
+    source "$ROOT_DIR/scripts/lib/codex-cli.sh"
+    CODEX_CLI="$(dotfiles_codex_cli)"
+    CODEX_CHECK_ARGS=(render-codex --repo "$ROOT_DIR" --home "$TARGET_HOME"
+      --render-root "$(rendered_config_root)" --platform "$DOTFILES_PLATFORM"
+      --role "$DOTFILES_ROLE" --mode "$DOTFILES_MODE" --shell "$DOTFILES_SHELL"
+      --fingerprint-live)
+    CODEX_INPUT_BEFORE="$("$CODEX_CLI" "${CODEX_CHECK_ARGS[@]}")"
+  fi
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
     render_args=("--dry-run" "${render_args[@]}")
@@ -209,8 +225,40 @@ link_rendered_codex_files() {
       continue
     fi
 
+    if [[ "$item" == "config.toml" && "$DRY_RUN" -ne 1 ]]; then
+      local input_now
+      input_now="$("$CODEX_CLI" "${CODEX_CHECK_ARGS[@]}")"
+      if [[ "$input_now" != "$CODEX_INPUT_BEFORE" ]]; then
+        log "Codex input changed before linking; retry after the client finishes saving."
+        return 1
+      fi
+    fi
     link_source_path "$source_path" "$target_path" ".codex/$item"
   done
+}
+
+link_claude_config() {
+  local apply_args=("--home" "$TARGET_HOME")
+
+  link_source_path "$ROOT_DIR/context/base/claude/CLAUDE.md" \
+    "$TARGET_HOME/.claude/CLAUDE.md" ".claude/CLAUDE.md"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    apply_args+=("--dry-run")
+  fi
+
+  # Portable settings merge into the live file; a failure must not block the rest.
+  if ! "$ROOT_DIR/scripts/apply-claude-settings" "${apply_args[@]}"; then
+    log "Claude settings were not applied; see the messages above."
+    [[ "$ONLY" == "claude" ]] && return 1
+  fi
+
+  # Private MCP servers are optional; a failure must not block the rest of the setup.
+  if ! "$ROOT_DIR/scripts/apply-claude-mcp" "${apply_args[@]}"; then
+    log "Claude MCP servers were not fully applied; see the messages above."
+    [[ "$ONLY" == "claude" ]] && return 1
+  fi
+  return 0
 }
 
 link_item() {
@@ -224,6 +272,9 @@ link_item() {
   fi
 
   ensure_parent_dir "$target_path"
+  if [[ "$relative_path" == .ssh/* ]]; then
+    run "chmod 700 '$TARGET_HOME/.ssh'"
+  fi
 
   if [[ -L "$target_path" ]]; then
     local current_target
@@ -277,7 +328,7 @@ if [[ -z "$TARGET_HOME" ]]; then
   exit 1
 fi
 
-if [[ -n "$ONLY" && "$ONLY" != "codex" ]]; then
+if [[ -n "$ONLY" && "$ONLY" != "codex" && "$ONLY" != "claude" ]]; then
   log "Invalid --only value: $ONLY"
   usage
   exit 1
@@ -287,6 +338,13 @@ export DOTFILES_CONTEXT_HOME="$TARGET_HOME"
 dotfiles_load_context
 
 log "Context: platform=$DOTFILES_PLATFORM role=$DOTFILES_ROLE mode=$DOTFILES_MODE shell=$DOTFILES_SHELL"
+
+if [[ "$ONLY" == "claude" ]]; then
+  link_claude_config
+  log "Done."
+  exit 0
+fi
+
 render_managed_configs
 
 if [[ "$ONLY" == "codex" ]]; then
@@ -298,7 +356,14 @@ fi
 
 link_raw_config_tree
 link_rendered_config_tree
+
+if [[ "$DOTFILES_PLATFORM" == "wsl" ]]; then
+  link_source_path "$ROOT_DIR/context/platform/wsl/.config/mimeapps.list" \
+    "$TARGET_HOME/.config/mimeapps.list" ".config/mimeapps.list"
+fi
+
 link_rendered_codex_files
+link_claude_config
 
 for item in "${LINK_ITEMS[@]}"; do
   link_item "$item"

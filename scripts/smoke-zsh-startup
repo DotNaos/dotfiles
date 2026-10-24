@@ -1,0 +1,145 @@
+#!/usr/bin/env zsh
+# Isolated behavior checks; no package installation, builds or network access.
+emulate -LR zsh
+setopt errexit nounset pipefail
+ROOT_DIR="${0:A:h:h}"
+TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-zsh.XXXXXX")"
+trap 'command rm -rf -- "$TEST_DIR"' EXIT
+
+fail() { print -u2 -- "$*"; exit 1; }
+has() { command -v "$1" >/dev/null 2>&1; }
+export DOTFILES_TEST_CALLS="$TEST_DIR/calls"
+export DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/cache"
+mkdir "$TEST_DIR/bin"
+path=("$TEST_DIR/bin" $path)
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=%s\n' "$1"
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+source "$ROOT_DIR/.zshrc.d/10-shell/38-completion-cache.zsh"
+
+dotfiles_load_generated_completion completion-fixture completion-fixture first
+[[ "$DOTFILES_TEST_COMPLETION" == first ]] || fail 'cold completion failed'
+dotfiles_load_generated_completion completion-fixture completion-fixture first
+[[ $(< "$DOTFILES_TEST_CALLS") == called ]] || fail 'warm cache ran generator'
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == second ]] || fail 'argument change did not invalidate cache'
+[[ ${#${(f)"$(< "$DOTFILES_TEST_CALLS")"}} == 2 ]] || fail 'argument regeneration count'
+
+# Replace the executable and verify failed output cannot replace a good cache.
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=broken\n'
+exit 1
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+unset DOTFILES_TEST_COMPLETION
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == second ]] || fail 'failed generator damaged existing cache'
+
+cat > "$TEST_DIR/bin/completion-fixture" <<'SH'
+#!/bin/sh
+printf 'called\n' >> "$DOTFILES_TEST_CALLS"
+printf 'typeset -g DOTFILES_TEST_COMPLETION=replaced\n'
+SH
+chmod +x "$TEST_DIR/bin/completion-fixture"
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ "$DOTFILES_TEST_COMPLETION" == replaced ]] || fail 'executable replacement did not invalidate cache'
+
+# Same-size atomic replacements can retain second-granularity timestamps.
+printf '#!/bin/sh\nprintf "typeset -g DOTFILES_TEST_ATOMIC=before\\n"\n' > "$TEST_DIR/bin/atomic-fixture"
+printf '#!/bin/sh\nprintf "typeset -g DOTFILES_TEST_ATOMIC=after_\\n"\n' > "$TEST_DIR/bin/atomic-replacement"
+chmod +x "$TEST_DIR/bin/atomic-fixture" "$TEST_DIR/bin/atomic-replacement"
+touch -r "$TEST_DIR/bin/atomic-fixture" "$TEST_DIR/bin/atomic-replacement"
+dotfiles_load_generated_completion atomic-fixture atomic-fixture
+command mv "$TEST_DIR/bin/atomic-replacement" "$TEST_DIR/bin/atomic-fixture"
+dotfiles_load_generated_completion atomic-fixture atomic-fixture
+[[ "$DOTFILES_TEST_ATOMIC" == after_ ]] || fail 'same-size atomic replacement was stale'
+
+# A stable launcher may switch its implementation without changing metadata.
+# Uncached generation must always reflect the currently selected implementation.
+export DOTFILES_TEST_ACTIVE="$TEST_DIR/current-completion"
+cat > "$TEST_DIR/bin/dispatcher-fixture" <<'SH'
+#!/bin/sh
+cat "$DOTFILES_TEST_ACTIVE"
+SH
+chmod +x "$TEST_DIR/bin/dispatcher-fixture"
+print 'typeset -g DOTFILES_TEST_DISPATCH=first' > "$DOTFILES_TEST_ACTIVE"
+dotfiles_load_uncached_completion dispatcher-fixture dispatcher-fixture
+print 'typeset -g DOTFILES_TEST_DISPATCH=second' > "$DOTFILES_TEST_ACTIVE"
+dotfiles_load_uncached_completion dispatcher-fixture dispatcher-fixture
+[[ "$DOTFILES_TEST_DISPATCH" == second ]] || fail 'dispatcher completion was stale'
+
+# A cache path occupied by a file must produce no output or partial state.
+print occupied > "$TEST_DIR/unavailable"
+DOTFILES_ZSH_CACHE_DIR="$TEST_DIR/unavailable"
+unset DOTFILES_TEST_COMPLETION
+dotfiles_load_generated_completion completion-fixture completion-fixture second
+[[ ! -v DOTFILES_TEST_COMPLETION ]] || fail 'unwritable cache changed completion state'
+
+# Every zsh can bootstrap from a clean PATH; repeated sourcing is idempotent.
+mkdir "$TEST_DIR/zdot"
+ln -s "$ROOT_DIR/.zshenv" "$TEST_DIR/zdot/.zshenv"
+ln -s "$ROOT_DIR/.zshrc" "$TEST_DIR/zdot/.zshrc"
+ln -s "$ROOT_DIR/.zprofile" "$TEST_DIR/zdot/.zprofile"
+ln -s "$ROOT_DIR/.zshrc.d" "$TEST_DIR/zdot/.zshrc.d"
+ZDOTDIR="$TEST_DIR/zdot" DOTFILES_ROOT="$ROOT_DIR" \
+  OP_SERVICE_ACCOUNT_TOKEN=synthetic DOPPLER_TOKEN=synthetic \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin zsh -lc '
+    [[ ! -v OP_SERVICE_ACCOUNT_TOKEN && ! -v DOPPLER_TOKEN ]] || exit 1
+    (( $+functions[safe_source] )) || exit 1
+    before=$PATH
+    source "$ZDOTDIR/.zshenv"
+    source "$ZDOTDIR/.zshrc"
+    [[ "$before" == "$PATH" ]] || exit 1
+    unique=("${(@u)path}")
+    [[ ${#path} -eq ${#unique} ]] || exit 1
+    [[ "$DOTFILES_SHELL" == zsh ]] || exit 1
+  '
+# Login PATH normalization must preserve an already selected fnm version.
+mkdir -p "$TEST_DIR/selected/bin"
+printf '#!/bin/sh\nexit 0\n' > "$TEST_DIR/selected/bin/node"
+chmod +x "$TEST_DIR/selected/bin/node"
+(
+  export FNM_MULTISHELL_PATH="$TEST_DIR/selected"
+  typeset -g __DOTFILES_FNM_READY=1
+  source "$ROOT_DIR/.zshrc.d/00-core/00-core.zsh"
+  path=("$FNM_MULTISHELL_PATH/bin" $path)
+  source "$ROOT_DIR/.zshrc.d/10-shell/00-paths.zsh"
+  [[ "$path[1]" == "$FNM_MULTISHELL_PATH/bin" ]] || fail 'fnm selection displaced'
+)
+
+# A manual .zshrc source must bootstrap even without a linked .zshenv.
+mkdir -p "$TEST_DIR/manual"
+ln -s "$ROOT_DIR/.zshrc.d" "$TEST_DIR/manual/.zshrc.d"
+ZDOTDIR="$TEST_DIR/manual" DOTFILES_ROOT="$ROOT_DIR" XDG_DATA_HOME="$TEST_DIR/no-plugins" \
+  XDG_CACHE_HOME="$TEST_DIR/manual-cache" zsh -fic '
+    source "$1/.zshrc"
+    (( $+functions[has] && $+functions[safe_source] )) || exit 1
+    [[ "$DOTFILES_SHELL" == zsh && -n "$DOTFILES_PLATFORM" ]] || exit 1
+  ' manual "$ROOT_DIR"
+
+# When the real optional provider is installed, verify its opt-in project
+# switching setup, including the directory-change hook, without installing Node.
+actual_nvm="${NVM_DIR:-$HOME/.nvm}"
+actual_versions=("$actual_nvm"/versions/node/*/bin/node(N))
+actual_plugin="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/snippets/OMZP::nvm/OMZP::nvm"
+if [[ -r "$actual_nvm/nvm.sh" && -r "$actual_plugin" && ${#actual_versions} -gt 0 ]]; then
+  mkdir "$TEST_DIR/autoload"
+  print -r -- "${actual_versions[1]:h:h:t}" > "$TEST_DIR/autoload/.nvmrc"
+  (
+    builtin cd "$TEST_DIR/autoload"
+    ZDOTDIR="$TEST_DIR/zdot" DOTFILES_ROOT="$ROOT_DIR" NVM_DIR="$actual_nvm" TERM=dumb \
+      zsh -fic '
+        source "$ZDOTDIR/.zshenv"
+        zstyle ":omz:plugins:nvm" autoload yes
+        source "$ZDOTDIR/.zshrc"
+        (( $+functions[load-nvmrc] && ${chpwd_functions[(Ie)load-nvmrc]} > 0 )) || exit 1
+        [[ "$NVM_BIN" == "$NVM_DIR/versions/node/$(< .nvmrc)/bin" ]] || exit 1
+      ' > "$TEST_DIR/autoload-proof.log" 2>&1
+  ) || fail 'real NVM automatic switching setup failed'
+fi
+print 'zsh startup smoke passed'
