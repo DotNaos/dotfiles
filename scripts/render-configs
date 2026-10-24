@@ -88,6 +88,14 @@ export DOTFILES_REPO_ROOT="$ROOT_DIR"
 export DOTFILES_RENDER_DRY_RUN="$DRY_RUN"
 export DOTFILES_RENDER_ONLY="$ONLY"
 
+# Validate and capture Codex settings before touching any rendered output.
+source "$ROOT_DIR/scripts/lib/codex-cli.sh"
+DOTFILES_BIN="$(dotfiles_codex_cli)"
+codex_args=(render-codex --repo "$ROOT_DIR" --home "$TARGET_HOME" --render-root "$RENDER_ROOT"
+  --platform "$DOTFILES_PLATFORM" --role "$DOTFILES_ROLE" --mode "$DOTFILES_MODE" --shell "$DOTFILES_SHELL")
+[[ "$DRY_RUN" -eq 1 ]] && codex_args+=(--dry-run)
+"$DOTFILES_BIN" "${codex_args[@]}"
+
 python3 - <<'PY'
 import json
 import os
@@ -172,11 +180,15 @@ def deep_merge(base: dict, overlay: dict) -> dict:
 
 
 if not dry_run:
-    if only == "codex":
-        shutil.rmtree(render_root / ".codex", ignore_errors=True)
-    else:
-        shutil.rmtree(render_root, ignore_errors=True)
     render_root.mkdir(parents=True, exist_ok=True)
+    if only != "codex":
+        for item in render_root.iterdir():
+            if item.name == ".codex":
+                continue
+            if item.is_dir() and not item.is_symlink():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
 
 active_layers = [layer for layer in layers if layer.exists()]
 for layer in active_layers:
@@ -184,38 +196,8 @@ for layer in active_layers:
 
 concat_buffer = {}
 json_buffer = {}
-codex_config_parts = []
-codex_config_keys = {}
 codex_agents_source = layers[0] / "codex" / "AGENTS.md"
 
-
-def load_codex_config_fragment(path: Path) -> str:
-    content = path.read_text()
-
-    for line_number, line in enumerate(content.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.startswith("[") or "=" not in stripped:
-            raise SystemExit(
-                f"Codex config fragments must use one dotted-key assignment per line: "
-                f"{path}:{line_number}"
-            )
-
-        key = stripped.split("=", 1)[0].strip()
-        for existing_key, existing_path in codex_config_keys.items():
-            if (
-                key == existing_key
-                or key.startswith(existing_key + ".")
-                or existing_key.startswith(key + ".")
-            ):
-                raise SystemExit(
-                    f"Conflicting Codex config key {key!r} in {path}; "
-                    f"already defined in {existing_path}"
-                )
-        codex_config_keys[key] = path
-
-    return content
 
 for layer in active_layers:
     for app in managed_apps:
@@ -238,12 +220,9 @@ for layer in active_layers:
                 json_buffer[relative] = deep_merge(current, load_json(file_path))
 
     codex_dir = layer / "codex"
-    codex_config = codex_dir / "config.toml"
 
     if layer != layers[0] and (codex_dir / "AGENTS.md").exists():
         raise SystemExit("Codex AGENTS.md is managed only from context/base/codex")
-    if codex_config.is_file():
-        codex_config_parts.append(load_codex_config_fragment(codex_config))
 
 context_dir = render_root / ".config" / "nvim" / "lua" / "config"
 context_file = context_dir / "dotfiles_context.lua"
@@ -271,21 +250,6 @@ if codex_agents_source.is_file():
         codex_render_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(codex_agents_source, codex_agents_target)
         codex_agents_target.chmod(0o644)
-
-if codex_config_parts:
-    codex_config_target = codex_render_dir / "config.toml"
-    codex_config_content = "\n\n".join(
-        part.rstrip("\n") for part in codex_config_parts if part.strip()
-    ) + "\n"
-    if dry_run:
-        log(
-            f"Would combine {len(codex_config_parts)} Codex layer(s) into "
-            f"{codex_config_target}"
-        )
-    else:
-        codex_render_dir.mkdir(parents=True, exist_ok=True)
-        codex_config_target.write_text(codex_config_content)
-        codex_config_target.chmod(0o600)
 
 for relative, parts in concat_buffer.items():
     destination = render_root / relative

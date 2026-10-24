@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-config-only.XXXXXX")"
+PYTHON_CACHE="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-python-cache.XXXXXX")"
+WSL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-wsl.XXXXXX")"
+trap 'rm -rf "$TEST_HOME" "$PYTHON_CACHE" "$WSL_HOME"' EXIT
+
+forbidden_pattern='apt-get|brew install|winget install|sudo (apt|cp|mv|sh)|scripts/system|/etc/'
+if rg -n "$forbidden_pattern" \
+  "$ROOT_DIR/setup" "$ROOT_DIR/scripts/setup" "$ROOT_DIR/scripts/link-home" "$ROOT_DIR/scripts/render-configs"; then
+  printf 'config-only guard failed: privileged or package installation call found\n' >&2
+  exit 1
+fi
+
+HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" PYTHONPYCACHEPREFIX="$PYTHON_CACHE" \
+  "$ROOT_DIR/setup" --config-only --dry-run
+
+if find "$TEST_HOME" -mindepth 1 -print -quit | grep -q .; then
+  printf 'config-only dry-run created files in the isolated home\n' >&2
+  exit 1
+fi
+
+HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" PYTHONPYCACHEPREFIX="$PYTHON_CACHE" \
+  "$ROOT_DIR/setup" --config-only
+
+test -L "$TEST_HOME/.zshrc"
+test -L "$TEST_HOME/.zprofile"
+test -L "$TEST_HOME/.ssh/config"
+python3 - "$TEST_HOME/.ssh" <<'PY_MODE'
+import os
+import stat
+import sys
+
+mode = stat.S_IMODE(os.stat(sys.argv[1]).st_mode)
+if mode != 0o700:
+    raise SystemExit(f"unexpected ~/.ssh mode: {mode:o}")
+PY_MODE
+grep -Fxq '    CanonicalDomains vpn.os-home.net' "$TEST_HOME/.ssh/config"
+if command -v ssh >/dev/null 2>&1; then
+  ssh -F "$TEST_HOME/.ssh/config" -G github.com >/dev/null
+fi
+test -L "$TEST_HOME/.config/zed"
+
+mkdir -p "$WSL_HOME/.config"
+printf 'text/plain=custom.desktop\n' > "$WSL_HOME/.config/mimeapps.list"
+HOME="$WSL_HOME" DOTFILES_CONTEXT_HOME="$WSL_HOME" DOTFILES_PLATFORM=wsl \
+  PYTHONPYCACHEPREFIX="$PYTHON_CACHE" "$ROOT_DIR/setup" --config-only
+test -L "$WSL_HOME/.config/mimeapps.list"
+cmp "$ROOT_DIR/context/platform/wsl/.config/mimeapps.list" "$WSL_HOME/.config/mimeapps.list"
+grep -Rq 'text/plain=custom.desktop' "$WSL_HOME/.dotfiles-backup"
+test -f "$TEST_HOME/.local/state/dotfiles/rendered/.codex/config.toml"
+cat >> "$TEST_HOME/.codex/config.toml" <<'TOML'
+
+[mcp_servers.synthetic_private]
+command = "/synthetic/private/command"
+args = ["synthetic-address"]
+TOML
+HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" PYTHONPYCACHEPREFIX="$PYTHON_CACHE" \
+  "$ROOT_DIR/setup" --config-only
+grep -Fq '/synthetic/private/command' "$TEST_HOME/.codex/config.toml"
+HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" PYTHONPYCACHEPREFIX="$PYTHON_CACHE" \
+  "$ROOT_DIR/scripts/link-home" --only codex
+grep -Fq '/synthetic/private/command' "$TEST_HOME/.codex/config.toml"
+printf '\ninvalid = [\n' >> "$TEST_HOME/.codex/config.toml"
+cp "$TEST_HOME/.codex/config.toml" "$TEST_HOME/config-invalid"
+if HOME="$TEST_HOME" DOTFILES_CONTEXT_HOME="$TEST_HOME" PYTHONPYCACHEPREFIX="$PYTHON_CACHE" \
+  "$ROOT_DIR/scripts/link-home" --only codex; then
+  printf 'malformed Codex input was accepted\n' >&2
+  exit 1
+fi
+cmp "$TEST_HOME/config-invalid" "$TEST_HOME/.codex/config.toml"
+printf 'config-only smoke passed\n'

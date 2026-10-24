@@ -14,6 +14,8 @@ if [[ "$TERM_PROGRAM" == "kiro" ]] && has kiro; then
   source "$(kiro --locate-shell-integration-path zsh)"
 fi
 
-if has fzf; then
-  eval "$(fzf --zsh)"
+# OMZ handles legacy/custom installations and search defaults when installed.
+# Keep the native fallback for shells without that optional plugin.
+if has fzf && (( ! $+functions[fzf-history-widget] )); then
+  dotfiles_load_generated_completion fzf fzf --zsh
 fi

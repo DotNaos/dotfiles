@@ -33,7 +33,7 @@ fi
 ################ PROMPT ################
 # ! >>>>>>>>> starship
 if [[ "${TERM:-}" != "dumb" ]] && command -v starship &>/dev/null; then
-  eval "$(starship init zsh)"
+  dotfiles_load_generated_completion starship starship init zsh --print-full-init
 fi
 
 ################ ZSTYLE ################
@@ -45,11 +45,11 @@ zstyle ':fzf-tab:*' path-expand false
 
 ################ ZINIT PLUGINS ################
 # Base
-zinit light zsh-users/zsh-syntax-highlighting
-zinit light zsh-users/zsh-completions
-zinit light zsh-users/zsh-autosuggestions
-zinit light Aloxaf/fzf-tab
+dotfiles_zinit_light zsh-users/zsh-syntax-highlighting
+dotfiles_zinit_light zsh-users/zsh-completions
+dotfiles_zinit_light zsh-users/zsh-autosuggestions
+dotfiles_zinit_light Aloxaf/fzf-tab
 
 # Custom
-# zinit light marlonrichert/zsh-autocomplete
-#zinit light jeffreytse/zsh-vi-mode
+# dotfiles_zinit_light marlonrichert/zsh-autocomplete
+#dotfiles_zinit_light jeffreytse/zsh-vi-mode
