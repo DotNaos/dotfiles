@@ -294,6 +294,70 @@ by the user; the scan is heuristic and not a comprehensive language detector.
 Findings return exit code `0` and are **not** a CI or pre-commit gate.
 Invalid repository/ref or other Git errors return `2`. No project files,
 hooks, CI configuration, or interpreter installations are changed.
+
+## RustDesk client deployment
+
+**Draft / ownership review:** These standalone installer scripts are retained as a proposal.
+They are not called by the config-only Dotfiles setup. Package and machine-service
+provisioning belongs to Systems; agree that handoff before delivering this draft.
+
+RustDesk is installed from the latest official GitHub release, configured for a
+self-hosted OSS server, registered as a system service and restarted. The
+bootstrap prints only the device's RustDesk ID; it never stores or prints a
+permanent access password.
+
+Configure the public server values in `config/rustdesk.env`. Prefer
+`RUSTDESK_REPO_CONFIG_STRING`, exported from **Settings → Network → Export Server
+Config** on an already configured client. The official
+[client configuration guide](https://rustdesk.com/docs/en/self-host/client-configuration/)
+documents importing that string with `--config`; a complete `RustDesk2.toml`
+import is intentionally not used because it can include unrelated, device-local
+settings. The deployment flags are also checked against the installed version
+and the corresponding official RustDesk release. If no config string is
+available, set the ID server, optional relay server and public key in the same
+file.
+
+On an existing dotfiles checkout:
+
+```powershell
+# Windows PowerShell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\dotfiles\scripts\rustdesk\bootstrap.ps1"
+```
+
+```bash
+# macOS or Linux
+sudo ./dotfiles/scripts/rustdesk/bootstrap.sh
+```
+
+For a new device without a checkout, run one remote bootstrap command after the
+pull request has been merged:
+
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/DotNaos/dotfiles/main/scripts/rustdesk/bootstrap.ps1 | iex
+```
+
+```bash
+# macOS or Linux
+curl -fsSL https://raw.githubusercontent.com/DotNaos/dotfiles/main/scripts/rustdesk/bootstrap.sh | sudo -E bash
+```
+
+Environment variables override repository values for one deployment:
+
+```bash
+RUSTDESK_CONFIG_STRING='...' \
+RUSTDESK_PASSWORD='secret-manager-value' \
+sudo --preserve-env=RUSTDESK_CONFIG_STRING,RUSTDESK_PASSWORD \
+  ./dotfiles/scripts/rustdesk/bootstrap.sh
+```
+
+The equivalent Windows variables are `RUSTDESK_CONFIG_STRING`,
+`RUSTDESK_ID_SERVER`, `RUSTDESK_RELAY_SERVER`, `RUSTDESK_PUBLIC_KEY` and the
+optional secret `RUSTDESK_PASSWORD`. A password should only be supplied through
+the process environment or a secret manager. macOS still requires Screen
+Recording, Accessibility and Input Monitoring approval, unless those permissions
+are deployed through MDM.
+
 ## Smoke checks
 
 Run after changes:
@@ -303,6 +367,7 @@ bash -n setup
 bash -n scripts/setup
 bash -n scripts/link-home
 bash -n scripts/render-configs
+bash -n scripts/rustdesk/bootstrap.sh
 bash -n scripts/smoke-config-only
 bash -n scripts/apply-claude-mcp
 bash -n scripts/smoke-claude-config
