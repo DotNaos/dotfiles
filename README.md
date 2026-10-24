@@ -169,6 +169,11 @@ interrupted, a protected `.publish-pending` marker blocks further rendering
 until local recovery has checked the private settings, output and history;
 do not clear this marker without reviewing or restoring those files.
 
+Codex agents record small, non-blocking workflow friction in the current
+repository's `PAPERCUTS.md` through the managed `papercut` CLI. The CLI is linked
+into `~/.local/bin/papercut` by the normal setup or Codex-only linking flow and
+does not perform transcript analysis or call another model.
+
 ## Claude Code
 
 Claude Code keeps credentials, account data, history and per-project state in
